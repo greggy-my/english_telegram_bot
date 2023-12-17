@@ -11,6 +11,7 @@ from nltk.tokenize import word_tokenize
 import nltk
 from Levenshtein import distance
 import re
+from scipy.spatial.distance import cityblock, euclidean
 
 
 english_words = [
@@ -309,7 +310,7 @@ russian_translations_4 = [
     "подчеркнуть необходимость",
     "приверженность сотрудников",
     "быть катализатором чего-л.",
-    "ускорить переход к цифровым технологиям",
+    "ускорить переход к цифровым технологиям"
     "цифровые жители",
     "быть погруженным во что-л.",
     "играть значимую содержательную роль",
@@ -388,33 +389,13 @@ def detect_text_language(text: str) -> str:
         return "Unknown"
 
 
-# def text_to_numbers(text: str, language: str) -> tuple:
-#     """
-#     Convert text to numbers character by character based on ASCII values.
-#
-#     Parameters:
-#     - text (str): The input text to be converted.
-#     - language (str): The language of the text ('english' or 'russian').
-#
-#     Returns:
-#     - list: A list of numbers representing the text character by character.
-#     """
-#     if language == 'russian':
-#         base_value = ord('а')  # Unicode code point of the first Russian letter 'а'
-#     else:
-#         base_value = ord('a')  # Unicode code point of the first English letter 'a'
-#
-#     numbers = tuple(ord(char) - base_value for char in text.lower())
-#     return numbers
-
-
 def text_to_numbers(text: str, language: str) -> tuple:
 
     if language == 'russian':
-        alphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+        alphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя "
         letter_vectors = {letter: i for i, letter in enumerate(alphabet)}
     else:
-        alphabet = "abcdefghijklmnopqrstuvwxyz"
+        alphabet = "abcdefghijklmnopqrstuvwxyz "
         letter_vectors = {letter: i for i, letter in enumerate(alphabet)}
 
     vector_counts = np.zeros(len(alphabet))
@@ -423,14 +404,17 @@ def text_to_numbers(text: str, language: str) -> tuple:
     # Count the occurrences of each letter in the word
     for index, letter in enumerate(text.lower()):
         if letter in alphabet:
-            vector_counts[letter_vectors[letter]] += 0.1
-            vector_positions[letter_vectors[letter]] += 1/(1 + exp(index))
+            vector_counts[letter_vectors[letter]] += 0
+            vector_positions[letter_vectors[letter]] += 1 / (1 + exp(2*index))
     final_vector = tuple(vector_counts+vector_positions)
     return final_vector
 
 
 def cosine_similarity(vector1: list, vector2: list) -> float:
     """Returns the cosine of the angle between two vectors."""
+    # vector1_mask = [1 if number != 0 else 0.3 for number in vector1]
+    # vector2 = list(np.array(vector1_mask)*np.array(vector2))
+
     dot_product = 0
     magnitude_vector1 = 0
     magnitude_vector2 = 0
@@ -485,10 +469,10 @@ def create_embedding_dicts(ru_word_dict: dict, en_word_dict: dict) -> tuple[defa
 
 
 def find_word(query: str, ru_word_dict_numbers:dict, ru_word_dict: dict, en_word_dict_numbers:dict, en_word_dict: dict)\
-        -> tuple[str, str, list, list] | None:
+        -> tuple[str, str] | tuple[None, None]:
 
-    pattern = re.compile(r'^[a-zA-Zа-яА-Я]+$')
-    if not bool(pattern.match(query)):
+    pattern = re.compile(r'^[0-9!@#$%^&*()_+=\-[\]{};:\'",.<>?/\\|`~]+$')
+    if bool(pattern.match(query)):
         return None, None
     ru_word_dict_numbers = copy.deepcopy(ru_word_dict_numbers)
     en_word_dict_numbers = copy.deepcopy(en_word_dict_numbers)
@@ -507,7 +491,6 @@ def find_word(query: str, ru_word_dict_numbers:dict, ru_word_dict: dict, en_word
                 max_sim = similarity
                 chosen_value = en_word
                 chosen_key = en_word_dict[chosen_value]
-                chosen_key_array = key_array
 
     elif language == 'english':
         for en_word, ru_word in en_word_dict_numbers.items():
@@ -518,47 +501,10 @@ def find_word(query: str, ru_word_dict_numbers:dict, ru_word_dict: dict, en_word
                 max_sim = similarity
                 chosen_value = ru_word
                 chosen_key = ru_word_dict[chosen_value]
-                chosen_key_array = key_array
     else:
         return None, None
 
-    print(query)
-    print(chosen_key_array)
-
     return chosen_key, chosen_value
-
-
-def find_word_levi(query: str, ru_word_dict_numbers:dict, ru_word_dict: dict, en_word_dict_numbers:dict, en_word_dict: dict)\
-        -> tuple[str, str, list, list] | None:
-    ru_word_dict_numbers = copy.deepcopy(ru_word_dict_numbers)
-    en_word_dict_numbers = copy.deepcopy(en_word_dict_numbers)
-    ru_word_dict = copy.copy(ru_word_dict)
-    en_word_dict = copy.copy(en_word_dict)
-    language = detect_text_language(query)
-
-    max_sim = - 10
-    if language == 'russian':
-        for ru_word, en_word in ru_word_dict.items():
-            similarity = 1 - (distance(query, ru_word)/max(len(query), len(ru_word)))
-
-            if similarity > max_sim:
-                max_sim = similarity
-                chosen_key = ru_word
-                chosen_value = en_word
-
-    elif language == 'english':
-        for en_word, ru_word in en_word_dict.items():
-            similarity = 1 - (distance(query, en_word)/max(len(query), len(en_word)))
-
-            if similarity > max_sim:
-                max_sim = similarity
-                chosen_key = en_word
-                chosen_value = ru_word
-
-    else:
-        return None
-
-    return chosen_key, chosen_value, query
 
 
 if __name__ == "__main__":
@@ -567,13 +513,7 @@ if __name__ == "__main__":
         ru_word_dict, en_word_dict = create_word_dicts(ru_list=ru_list, en_list=en_list)
         ru_word_dict_numbers, en_word_dict_numbers = create_embedding_dicts(ru_word_dict=ru_word_dict,
                                                                             en_word_dict=en_word_dict)
-        print(find_word(query='endurance',
-                  ru_word_dict=ru_word_dict,
-                  en_word_dict=en_word_dict,
-                  ru_word_dict_numbers=ru_word_dict_numbers,
-                  en_word_dict_numbers=en_word_dict_numbers))
-
-        print(find_word_levi(query='en',
+        print(find_word(query='to loo',
                   ru_word_dict=ru_word_dict,
                   en_word_dict=en_word_dict,
                   ru_word_dict_numbers=ru_word_dict_numbers,

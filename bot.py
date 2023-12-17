@@ -1,6 +1,8 @@
 import codecs
 import os
 import random
+
+import aiofiles
 import aiogram
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -67,6 +69,15 @@ def choose_options(question: str, question_language: str) -> list[str]:
     return options
 
 
+async def save_number_users(file_path, content):
+    try:
+        async with aiofiles.open(file_path, 'w') as file:
+            await file.write(content)
+        print(f"Content saved to {file_path} asynchronously.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 async def main() -> None:
     await dp.start_polling(bot)
 
@@ -104,8 +115,7 @@ async def start(message: types.Message):
     messages[message.chat.id].append(initial_message.message_id)
     messages[message.chat.id].append(game_message.message_id)
 
-    with open('unique_users.txt', 'w') as file:
-        file.write(f'{len(unique_users)}')
+    await save_number_users(file_path='unique_users.txt', content=f'{len(unique_users)}')
 
 
 @dp.message(aiogram.filters.command.Command(commands='instruct'))
