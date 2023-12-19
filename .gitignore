@@ -7,6 +7,5 @@
 /.idea/.gitignore
 /test.py
 *.xlsx
-/users_progress.json
-/github_link.txt
-/unique_users.txt
+*.json
+*.txt

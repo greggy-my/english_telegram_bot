@@ -10,7 +10,7 @@ import asyncio
 
 
 def create_lists():
-    df = pd.read_excel('translation_pairs.xlsx')
+    df = pd.read_excel('data_storage/translation_pairs.xlsx')
     en_list = [s.lower().capitalize().replace('.', '') for s in df['en'].to_list()]
     ru_list = [s.lower().capitalize().replace('.', '') for s in df['ru'].to_list()]
 

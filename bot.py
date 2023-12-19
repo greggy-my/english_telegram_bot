@@ -23,18 +23,46 @@ dp = Dispatcher()
 bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
 
 # Main bot storage
-questions = defaultdict()
-messages = defaultdict(list)
 unique_users = set()
+#
+# if 'users_progress.json' in os.listdir():
+#     with open('data_storage/users_progress.json', 'r') as file:
+#         data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
+#     users_progress_weights = defaultdict(None, data)
+# else:
+#     users_progress_weights = defaultdict()
+#
+# if 'data_storage/questions.json' in os.listdir():
+#     with open('data_storage/questions.json', 'r') as file:
+#         data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
+#     questions = defaultdict(None, data)
+# else:
+#     questions = defaultdict()
+#
+# if 'data_storage/messages.json' in os.listdir():
+#     with open('data_storage/messages.json', 'r') as file:
+#         data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
+#     messages = defaultdict(list, data)
+# else:
+#     messages = defaultdict(list)
 
-if 'users_progress.json' in os.listdir():
-    with open('users_progress.json', 'r') as file:
-        data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
-    users_progress_weights = defaultdict(None, data)
-else:
-    users_progress_weights = defaultdict()
 
-# Main data storage
+def load_json_file(file_path, default_factory, key_transform=int):
+    if file_path in os.listdir('data_storage'):
+        with open(f'data_storage/{file_path}', 'r') as file:
+            data = json.load(file, object_hook=lambda x: {key_transform(k) if k.isdigit() else k: v for k, v in x.items()})
+        return defaultdict(default_factory, data)
+    else:
+        return defaultdict(default_factory)
+
+
+users_progress_weights = load_json_file('users_progress.json', None)
+questions = load_json_file('questions.json', None)
+print(questions)
+messages = load_json_file('messages.json', list)
+print(messages)
+
+# Main word data storage
 ru_list, en_list = create_lists()
 ru_word_dict, en_word_dict, ru_dict_ind, en_dict_ind = create_word_dicts(ru_list=ru_list, en_list=en_list)
 ru_word_dict_numbers, en_word_dict_numbers = create_embedding_dicts(ru_word_dict=ru_word_dict,
@@ -107,15 +135,25 @@ async def update_user_progress(user_id, question, language, answer_status):
         if answer_status == 'right':
             coefficient = 0.5
         elif answer_status == 'wrong':
-            coefficient = 2
+            coefficient = 1.5
 
         users_progress_weights[user_id][question_index] = round(
             users_progress_weights[user_id][question_index] * coefficient, 4)
 
 
 async def save_user_progress():
-    async with aiofiles.open('users_progress.json', 'w') as file:
+    async with aiofiles.open('data_storage/users_progress.json', 'w') as file:
         await file.write(json.dumps(users_progress_weights))
+
+
+async def save_user_questions():
+    async with aiofiles.open('data_storage/questions.json', 'w') as file:
+        await file.write(json.dumps(questions))
+
+
+async def save_user_messages():
+    async with aiofiles.open('data_storage/messages.json', 'w') as file:
+        await file.write(json.dumps(messages))
 
 
 async def inline_builder(question, question_language):
@@ -144,12 +182,14 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     unique_users.add(user_id)
     await initiate_user_progress(user_id)
-    await save_number_users(file_path='unique_users.txt', content=f'{len(unique_users)}')
+    await save_number_users(file_path='data_storage/unique_users.txt', content=f'{len(unique_users)}')
     initial_message = await bot.send_message(chat_id=chat_id,
                                              text="Плотный салам")
     messages[message.chat.id].append(initial_message.message_id)
     await send_instructions(message)
     messages[chat_id].append(message.message_id)
+
+    await save_user_messages()
 
 
 @dp.message(aiogram.filters.command.Command(commands='spin'))
@@ -157,6 +197,7 @@ async def spin(message: types.Message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     unique_users.add(user_id)
+
     await initiate_user_progress(user_id)
 
     # Searching for a new question
@@ -167,6 +208,8 @@ async def spin(message: types.Message):
 
     # Preparing new options
     questions[chat_id] = (question, question_language)
+    await save_user_questions()
+
     builder = await inline_builder(question=question, question_language=question_language)
 
     # Sending new message
@@ -177,12 +220,17 @@ async def spin(message: types.Message):
     messages[chat_id].append(game_message.message_id)
     messages[chat_id].append(message.message_id)
 
+    await save_user_messages()
+
 
 @dp.message(aiogram.filters.command.Command(commands='save'))
 async def save_progress(message: types.Message):
     await save_user_progress()
+
     chat_id = message.chat.id
     messages[chat_id].append(message.message_id)
+
+    await save_user_messages()
 
 
 @dp.message(aiogram.filters.command.Command(commands='instruct'))
@@ -197,14 +245,16 @@ async def send_instructions(message: types.Message):
 """
     instruction_message = await bot.send_message(chat_id=message.chat.id,
                                                  text=text)
-    messages[chat_id].append(instruction_message.message_id)
     messages[chat_id].append(message.message_id)
+
+    await save_user_messages()
 
 
 @dp.message()
 async def find_translation(message: types.message):
     unique_users.add(message.from_user.id)
     chat_id = message.chat.id
+
     found_word, found_translation = await find_word(query=message.text,
                                                     ru_word_dict=ru_word_dict,
                                                     en_word_dict=en_word_dict,
@@ -227,9 +277,6 @@ async def find_translation(message: types.message):
                                               text=f"Для тебя есть два варианта:"
                                                    f"\n\nФраза: {found_word}\n\nПеревод: {found_translation}\n\n"
                                                    f"Фраза: {found_word_hash}\n\nПеревод: {found_translation_hash}")
-
-    messages[chat_id].append(find_message.message_id)
-    messages[chat_id].append(message.message_id)
 
 
 @dp.callback_query()
@@ -281,6 +328,8 @@ async def check_translation(callback_query: types.callback_query):
 
         # Preparing new buttons
         questions[chat_id] = (question, question_language)
+        await save_user_questions()
+
         builder = await inline_builder(question=question, question_language=question_language)
 
         # Sending new markup
@@ -288,6 +337,8 @@ async def check_translation(callback_query: types.callback_query):
                                                       text=new_question,
                                                       reply_markup=builder.as_markup())
         messages[chat_id].append(new_question_message.message_id)
+
+        await save_user_messages()
     else:
         # Wrong answer message
         wrong_answer_message = await bot.send_message(chat_id=callback_query.message.chat.id,
@@ -296,8 +347,12 @@ async def check_translation(callback_query: types.callback_query):
                                    language=question_language,
                                    question=questions[chat_id][0],
                                    answer_status='wrong')
+
         await save_user_progress()
+
         messages[chat_id].append(wrong_answer_message.message_id)
+
+        await save_user_messages()
 
 
 if __name__ == '__main__':
