@@ -101,9 +101,9 @@ async def update_user_progress(user_id, question, language, answer_status):
             question_index = en_dict_ind[question]
 
         if answer_status == 'right':
-            coefficient = 0.8
+            coefficient = 0.5
         elif answer_status == 'wrong':
-            coefficient = 1.2
+            coefficient = 2
 
         users_progress_weights[user_id][question_index] = round(
             users_progress_weights[user_id][question_index]*coefficient, 4)
@@ -114,25 +114,7 @@ async def save_user_progress():
         await file.write(json.dumps(dict(users_progress_weights), indent=2))
 
 
-async def main() -> None:
-    await dp.start_polling(bot)
-
-
-@dp.message(CommandStart())
-async def start(message: types.Message):
-    unique_users.add(message.from_user.id)
-    await initiate_user_progress(message.from_user.id)
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-
-    # Searching for a new question
-    question, answer, question_language, question_status = await choose_question(user_id=user_id)
-    if question_status == 'long':
-        while question_status == 'long':
-            question, answer, question_language, question_status = await choose_question(user_id=user_id)
-
-    # Preparing new options
-    questions[chat_id] = (question, question_language)
+async def inline_builder(question, question_language):
     options = await choose_options(question=question, question_language=question_language)
 
     # Preparing new buttons
@@ -145,35 +127,74 @@ async def start(message: types.Message):
 
     builder.adjust(1, 1, 1, 1)
 
-    # Sending new message
+    return builder
+
+
+async def main() -> None:
+    await dp.start_polling(bot)
+
+
+@dp.message(CommandStart())
+async def start(message: types.Message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    unique_users.add(user_id)
+    await initiate_user_progress(user_id)
+    await save_number_users(file_path='unique_users.txt', content=f'{len(unique_users)}')
     initial_message = await bot.send_message(chat_id=chat_id,
-                                          text="Плотный салам")
+                                             text="Плотный салам")
+    messages[message.chat.id].append(initial_message.message_id)
+    await send_instructions(message)
+    messages[chat_id].append(message.message_id)
+
+
+@dp.message(aiogram.filters.command.Command(commands='spin'))
+async def spin(message: types.Message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    unique_users.add(user_id)
+    await initiate_user_progress(user_id)
+
+    # Searching for a new question
+    question, answer, question_language, question_status = await choose_question(user_id=user_id)
+    if question_status == 'long':
+        while question_status == 'long':
+            question, answer, question_language, question_status = await choose_question(user_id=user_id)
+
+    # Preparing new options
+    questions[chat_id] = (question, question_language)
+    builder = await inline_builder(question=question, question_language=question_language)
+
+    # Sending new message
     game_message = await message.answer("Как переводится:\n\n"
                                            f"{question}",
                                            reply_markup=builder.as_markup())
 
-    messages[message.chat.id].append(initial_message.message_id)
-    messages[message.chat.id].append(game_message.message_id)
-
-    await save_number_users(file_path='unique_users.txt', content=f'{len(unique_users)}')
+    messages[chat_id].append(game_message.message_id)
+    messages[chat_id].append(message.message_id)
 
 
 @dp.message(aiogram.filters.command.Command(commands='save'))
 async def save_progress(message: types.Message):
     await save_user_progress()
+    chat_id = message.chat.id
+    messages[chat_id].append(message.message_id)
 
 
 @dp.message(aiogram.filters.command.Command(commands='instruct'))
 async def send_instructions(message: types.Message):
-    unique_users.add(message.from_user.id)
+    chat_id = message.chat.id
     text = """
-1. Для вызова игры в меню используйте функцию 'Крути_барабан', которая запустит игру с выбором правильного перевода слова. Вам могут выпадать сообщения с идиомами после прокрутки барабана.
+1. Для вызова игры в меню используйте функцию 'Крути барабан', которая запустит игру с выбором правильного перевода слова. Вам могут выпадать сообщения с идиомами после прокрутки барабана
 
-2. Если вы напишете сообщение в чат вам вернется найденное слово и его перевод на основе вашего сообщения. Рекомендую потестировать, написав пару неполных слов.
+2. Чат сохраняет ваш прогресс. Отвечаете правильно - этот вопрос будет попадаться все меньше, и наоборот
+
+3. Если вы напишете сообщение в чат вам вернется найденное слово и его перевод на основе вашего сообщения. Рекомендую потестировать, написав пару неполных слов
 """
     instruction_message = await bot.send_message(chat_id=message.chat.id,
                                                  text=text)
-    messages[message.chat.id].append(instruction_message.message_id)
+    messages[chat_id].append(instruction_message.message_id)
+    messages[chat_id].append(message.message_id)
 
 
 @dp.message()
@@ -253,15 +274,7 @@ async def check_translation(callback_query: types.callback_query):
 
         # Preparing new buttons
         questions[chat_id] = (question, question_language)
-        options = await choose_options(question=question, question_language=question_language)
-
-        buttons = []
-        for option in options:
-            buttons.append(InlineKeyboardButton(text=option, callback_data=option))
-
-        markup = InlineKeyboardMarkup(inline_keyboard=[buttons])
-        builder = InlineKeyboardBuilder.from_markup(markup)
-        builder.adjust(1, 1, 1, 1)
+        builder = await inline_builder(question=question, question_language=question_language)
 
         # Sending new markup
         new_question_message = await bot.send_message(chat_id=callback_query.message.chat.id,
