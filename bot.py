@@ -1,7 +1,7 @@
 import codecs
+import json
 import os
 import random
-
 import aiofiles
 import aiogram
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
@@ -26,45 +26,55 @@ questions = defaultdict()
 messages = defaultdict(list)
 unique_users = set()
 
+if 'users_progress.json' in os.listdir():
+    with open('users_progress.json', 'r') as file:
+        data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
+    users_progress_weights = defaultdict(None, data)
+else:
+    users_progress_weights = defaultdict()
+
 # Main data storage
 ru_list, en_list = create_lists()
-ru_word_dict, en_word_dict = create_word_dicts(ru_list=ru_list, en_list=en_list)
+ru_word_dict, en_word_dict, ru_dict_ind, en_dict_ind = create_word_dicts(ru_list=ru_list, en_list=en_list)
 ru_word_dict_numbers, en_word_dict_numbers = create_embedding_dicts(ru_word_dict=ru_word_dict,
                                                                     en_word_dict=en_word_dict)
+ru_string_search = StringSearch(ru_list)
+en_string_search = StringSearch(en_list)
 
 
-def choose_question():
+async def choose_question(user_id):
     choice = random.randint(0, 1)
+
     if choice == 0:
-        question = random.choice(ru_list)
-        if len(question.encode('utf-8')) < 62 and ru_word_dict[question] is not None and len(
-                ru_word_dict[question].encode('utf-8')) < 62:
-            return question, None, 'russian'
-        else:
-            return question, ru_word_dict[question], 'russian'
-    if choice == 1:
-        question = random.choice(en_list)
-        if len(question.encode('utf-8')) < 62 and en_word_dict[question] is not None and len(
-                en_word_dict[question].encode('utf-8')) < 62:
-            return question, None, 'english'
-        else:
-            return question, en_word_dict[question], 'english'
+        question = random.choices(ru_list, weights=users_progress_weights[user_id], k=1)[0]
+        translation = ru_word_dict.get(question)
+        language = 'russian'
+    else:
+        question = random.choices(en_list, weights=users_progress_weights[user_id], k=1)[0]
+        translation = en_word_dict.get(question)
+        language = 'english'
+
+    if len(question.encode('utf-8')) < 62 and len(translation.encode('utf-8')) < 62:
+        return question, translation, language, 'short'
+    else:
+        return question, translation, language, 'long'
 
 
-def choose_options(question: str, question_language: str) -> list[str]:
+async def choose_options(question: str, question_language: str) -> list[str]:
+    def get_random_word(language):
+        word_list = en_list if language == 'russian' else ru_list
+        return random.choice(word_list)
+
     options = []
-    if question_language == 'russian':
-        while len(options) < 3:
-            option = random.choice(en_list)
-            if len(option.encode('utf-8')) < 62:
-                options.append(option)
-        options.append(ru_word_dict[question])
-    elif question_language == 'english':
-        while len(options) < 3:
-            option = random.choice(ru_list)
-            if len(option.encode('utf-8')) < 62:
-                options.append(option)
-        options.append(en_word_dict[question])
+
+    while len(options) < 3:
+        option = get_random_word(question_language)
+        if len(option.encode('utf-8')) < 62:
+            options.append(option)
+
+    word_dict = ru_word_dict if question_language == 'russian' else en_word_dict
+    options.append(word_dict[question])
+
     random.shuffle(options)
     return options
 
@@ -78,6 +88,32 @@ async def save_number_users(file_path, content):
         print(f"An error occurred: {e}")
 
 
+async def initiate_user_progress(user_id):
+    if user_id not in list(users_progress_weights.keys()):
+        users_progress_weights[user_id] = [1 for _ in range(len(ru_list))]
+
+
+async def update_user_progress(user_id, question, language, answer_status):
+    if user_id in users_progress_weights.keys():
+        if language == 'russian':
+            question_index = ru_dict_ind[question]
+        elif language == 'english':
+            question_index = en_dict_ind[question]
+
+        if answer_status == 'right':
+            coefficient = 0.8
+        elif answer_status == 'wrong':
+            coefficient = 1.2
+
+        users_progress_weights[user_id][question_index] = round(
+            users_progress_weights[user_id][question_index]*coefficient, 4)
+
+
+async def save_user_progress():
+    async with aiofiles.open('users_progress.json', 'w') as file:
+        await file.write(json.dumps(dict(users_progress_weights), indent=2))
+
+
 async def main() -> None:
     await dp.start_polling(bot)
 
@@ -85,15 +121,19 @@ async def main() -> None:
 @dp.message(CommandStart())
 async def start(message: types.Message):
     unique_users.add(message.from_user.id)
+    await initiate_user_progress(message.from_user.id)
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+
     # Searching for a new question
-    question, answer, question_language = choose_question()
-    if answer is not None:
-        while answer is not None:
-            question, answer, question_language = choose_question()
+    question, answer, question_language, question_status = await choose_question(user_id=user_id)
+    if question_status == 'long':
+        while question_status == 'long':
+            question, answer, question_language, question_status = await choose_question(user_id=user_id)
 
     # Preparing new options
-    questions[message.chat.id] = question
-    options = choose_options(question=question, question_language=question_language)
+    questions[chat_id] = (question, question_language)
+    options = await choose_options(question=question, question_language=question_language)
 
     # Preparing new buttons
     buttons = []
@@ -106,7 +146,7 @@ async def start(message: types.Message):
     builder.adjust(1, 1, 1, 1)
 
     # Sending new message
-    initial_message = await bot.send_message(chat_id=message.chat.id,
+    initial_message = await bot.send_message(chat_id=chat_id,
                                           text="Плотный салам")
     game_message = await message.answer("Как переводится:\n\n"
                                            f"{question}",
@@ -118,8 +158,13 @@ async def start(message: types.Message):
     await save_number_users(file_path='unique_users.txt', content=f'{len(unique_users)}')
 
 
+@dp.message(aiogram.filters.command.Command(commands='save'))
+async def save_progress(message: types.Message):
+    await save_user_progress()
+
+
 @dp.message(aiogram.filters.command.Command(commands='instruct'))
-async def start(message: types.Message):
+async def send_instructions(message: types.Message):
     unique_users.add(message.from_user.id)
     text = """
 1. Для вызова игры в меню используйте функцию 'Крути_барабан', которая запустит игру с выбором правильного перевода слова. Вам могут выпадать сообщения с идиомами после прокрутки барабана.
@@ -134,59 +179,81 @@ async def start(message: types.Message):
 @dp.message()
 async def find_translation(message: types.message):
     unique_users.add(message.from_user.id)
-    found_word, found_translation = find_word(query=message.text,
+    found_word, found_translation = await find_word(query=message.text,
                                               ru_word_dict=ru_word_dict,
                                               en_word_dict=en_word_dict,
                                               ru_word_dict_numbers=ru_word_dict_numbers,
                                               en_word_dict_numbers=en_word_dict_numbers)
+
+    found_word_hash, found_translation_hash = await find_word_hash(query=message.text,
+                                              ru_word_dict=ru_word_dict,
+                                              en_word_dict=en_word_dict,
+                                              ru_string_search=ru_string_search,
+                                              en_string_search=en_string_search)
     if found_word is None:
         find_message = await bot.send_message(chat_id=message.chat.id,
                                               text=f"Ошибочка вышла:\n\nНе смог найти")
+    elif (found_word == found_word_hash) or (found_word_hash is None):
+        find_message = await bot.send_message(chat_id=message.chat.id,
+                                              text=f"Ты это искал:\n\nФраза: {found_word}\n\nПеревод: {found_translation}")
     else:
         find_message = await bot.send_message(chat_id=message.chat.id,
-                                              text=f"Ты это искал:\n\n{found_word}\n\n{found_translation}")
+                                              text=f"Для тебя есть два варианта:"
+                                                   f"\n\nФраза: {found_word}\n\nПеревод: {found_translation}\n\n"
+                                                   f"Фраза: {found_word_hash}\n\nПеревод: {found_translation_hash}")
+
     messages[message.chat.id].append(find_message.message_id)
 
 
-@dp.callback_query(lambda callback_query: callback_query.data in en_list or callback_query.data in ru_list)
+@dp.callback_query()
 async def check_translation(callback_query: types.callback_query):
-    unique_users.add(callback_query.from_user.id)
     user_translation = callback_query.data
-    question_language = detect_text_language(questions[callback_query.message.chat.id])
+    chat_id = callback_query.message.chat.id
+    user_id = callback_query.from_user.id
+
+    question, question_language = questions[chat_id]
+
     if question_language == 'russian':
-        correct_translation = ru_word_dict[questions[callback_query.message.chat.id]]
+        correct_translation = ru_word_dict[question]
     else:
-        correct_translation = en_word_dict[questions[callback_query.message.chat.id]]
+        correct_translation = en_word_dict[question]
 
     if user_translation == correct_translation:
-
         # Deleting previous messages
-        for message_id in messages[callback_query.message.chat.id]:
+        for message_id in messages[chat_id]:
             try:
-                await bot.delete_message(chat_id=callback_query.message.chat.id, message_id=message_id)
+                await bot.delete_message(chat_id=chat_id, message_id=message_id)
             except:
                 continue
-        messages[callback_query.message.chat.id] = []
+        messages[chat_id] = []
+
+        await update_user_progress(user_id=user_id,
+                                   language=question_language,
+                                   question=question,
+                                   answer_status='right')
+        await save_user_progress()
 
         # Searching for a new question
-        question, answer, question_language = choose_question()
-        if answer is not None:
-            greet_message = await bot.send_message(chat_id=callback_query.message.chat.id,
+        question, answer, question_language, question_status = await choose_question(user_id=user_id)
+        if question_status == 'long':
+            greet_message = await bot.send_message(chat_id=chat_id,
                                                    text=f"Правильно, Валерий Игоревич оценил")
-            messages[callback_query.message.chat.id].append(greet_message.message_id)
-            while answer is not None:
-                extra_info_message = await bot.send_message(chat_id=callback_query.message.chat.id,
-                                                            text=f"Глянь важную инфу\n\nФраза: {question}\n\nПеревод: {answer}")
-                messages[callback_query.message.chat.id].append(extra_info_message.message_id)
-                question, answer, question_language = choose_question()
+            messages[chat_id].append(greet_message.message_id)
+
+            extra_info_message = await bot.send_message(chat_id=chat_id,
+                                                        text=f"Глянь важную инфу\n\nФраза: {question}\n\nПеревод: {answer}")
+            messages[chat_id].append(extra_info_message.message_id)
+
+            while question_status == 'long':
+                question, answer, question_language, question_status = await choose_question(user_id=user_id)
 
             new_question = f"Как переводится:\n\n{question}"
         else:
             new_question = f"Правильно, Валерий Игоревич оценил\n\nКак переводится:\n\n{question}"
 
         # Preparing new buttons
-        questions[callback_query.message.chat.id] = question
-        options = choose_options(question=question, question_language=question_language)
+        questions[chat_id] = (question, question_language)
+        options = await choose_options(question=question, question_language=question_language)
 
         buttons = []
         for option in options:
@@ -200,11 +267,16 @@ async def check_translation(callback_query: types.callback_query):
         new_question_message = await bot.send_message(chat_id=callback_query.message.chat.id,
                                                       text=new_question,
                                                       reply_markup=builder.as_markup())
-        messages[callback_query.message.chat.id].append(new_question_message.message_id)
+        messages[chat_id].append(new_question_message.message_id)
     else:
         # Wrong answer message
         wrong_answer_message = await bot.send_message(chat_id=callback_query.message.chat.id,
                                                       text=f"Неверно. Не разочаровывай, выбери еще раз")
+        await update_user_progress(user_id=user_id,
+                                   language=question_language,
+                                   question=questions[chat_id][0],
+                                   answer_status='wrong')
+        await save_user_progress()
         messages[callback_query.message.chat.id].append(wrong_answer_message.message_id)
 
 

@@ -6,3 +6,5 @@
 /.idea/english_bot.iml
 /.idea/.gitignore
 /test.py
+*.xlsx
+/users_progress.json
