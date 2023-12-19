@@ -15,7 +15,8 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from collections import defaultdict
 
-TOKEN = str(os.getenv('TOKEN'))
+# TOKEN = str(os.getenv('TOKEN'))
+TOKEN = str(os.getenv('TOKEN_TEST'))
 
 # Инициализация бота и диспетчера
 dp = Dispatcher()
@@ -89,8 +90,11 @@ async def save_number_users(file_path, content):
 
 
 async def initiate_user_progress(user_id):
-    if user_id not in list(users_progress_weights.keys()):
+    if user_id not in users_progress_weights.keys():
         users_progress_weights[user_id] = [1 for _ in range(len(ru_list))]
+    else:
+        if len(ru_list) > len(users_progress_weights[user_id]):
+            users_progress_weights[user_id] += [2] * (len(ru_list) - len(users_progress_weights[user_id]))
 
 
 async def update_user_progress(user_id, question, language, answer_status):
@@ -106,12 +110,12 @@ async def update_user_progress(user_id, question, language, answer_status):
             coefficient = 2
 
         users_progress_weights[user_id][question_index] = round(
-            users_progress_weights[user_id][question_index]*coefficient, 4)
+            users_progress_weights[user_id][question_index] * coefficient, 4)
 
 
 async def save_user_progress():
     async with aiofiles.open('users_progress.json', 'w') as file:
-        await file.write(json.dumps(dict(users_progress_weights), indent=2))
+        await file.write(json.dumps(users_progress_weights))
 
 
 async def inline_builder(question, question_language):
@@ -167,8 +171,8 @@ async def spin(message: types.Message):
 
     # Sending new message
     game_message = await message.answer("Как переводится:\n\n"
-                                           f"{question}",
-                                           reply_markup=builder.as_markup())
+                                        f"{question}",
+                                        reply_markup=builder.as_markup())
 
     messages[chat_id].append(game_message.message_id)
     messages[chat_id].append(message.message_id)
@@ -200,17 +204,18 @@ async def send_instructions(message: types.Message):
 @dp.message()
 async def find_translation(message: types.message):
     unique_users.add(message.from_user.id)
+    chat_id = message.chat.id
     found_word, found_translation = await find_word(query=message.text,
-                                              ru_word_dict=ru_word_dict,
-                                              en_word_dict=en_word_dict,
-                                              ru_word_dict_numbers=ru_word_dict_numbers,
-                                              en_word_dict_numbers=en_word_dict_numbers)
+                                                    ru_word_dict=ru_word_dict,
+                                                    en_word_dict=en_word_dict,
+                                                    ru_word_dict_numbers=ru_word_dict_numbers,
+                                                    en_word_dict_numbers=en_word_dict_numbers)
 
     found_word_hash, found_translation_hash = await find_word_hash(query=message.text,
-                                              ru_word_dict=ru_word_dict,
-                                              en_word_dict=en_word_dict,
-                                              ru_string_search=ru_string_search,
-                                              en_string_search=en_string_search)
+                                                                   ru_word_dict=ru_word_dict,
+                                                                   en_word_dict=en_word_dict,
+                                                                   ru_string_search=ru_string_search,
+                                                                   en_string_search=en_string_search)
     if found_word is None:
         find_message = await bot.send_message(chat_id=message.chat.id,
                                               text=f"Ошибочка вышла:\n\nНе смог найти")
@@ -223,7 +228,8 @@ async def find_translation(message: types.message):
                                                    f"\n\nФраза: {found_word}\n\nПеревод: {found_translation}\n\n"
                                                    f"Фраза: {found_word_hash}\n\nПеревод: {found_translation_hash}")
 
-    messages[message.chat.id].append(find_message.message_id)
+    messages[chat_id].append(find_message.message_id)
+    messages[chat_id].append(message.message_id)
 
 
 @dp.callback_query()
@@ -241,7 +247,7 @@ async def check_translation(callback_query: types.callback_query):
 
     if user_translation == correct_translation:
         # Deleting previous messages
-        for message_id in messages[chat_id]:
+        for message_id in messages.get(chat_id, None):
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=message_id)
             except:
@@ -255,6 +261,7 @@ async def check_translation(callback_query: types.callback_query):
         await save_user_progress()
 
         # Searching for a new question
+        # Make it more efficient by splitting the dataset by the length
         question, answer, question_language, question_status = await choose_question(user_id=user_id)
         if question_status == 'long':
             greet_message = await bot.send_message(chat_id=chat_id,
@@ -290,7 +297,7 @@ async def check_translation(callback_query: types.callback_query):
                                    question=questions[chat_id][0],
                                    answer_status='wrong')
         await save_user_progress()
-        messages[callback_query.message.chat.id].append(wrong_answer_message.message_id)
+        messages[chat_id].append(wrong_answer_message.message_id)
 
 
 if __name__ == '__main__':
