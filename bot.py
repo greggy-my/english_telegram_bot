@@ -22,32 +22,9 @@ TOKEN = str(os.getenv('TOKEN_TEST'))
 dp = Dispatcher()
 bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
 
-# Main bot storage
-unique_users = set()
-#
-# if 'users_progress.json' in os.listdir():
-#     with open('data_storage/users_progress.json', 'r') as file:
-#         data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
-#     users_progress_weights = defaultdict(None, data)
-# else:
-#     users_progress_weights = defaultdict()
-#
-# if 'data_storage/questions.json' in os.listdir():
-#     with open('data_storage/questions.json', 'r') as file:
-#         data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
-#     questions = defaultdict(None, data)
-# else:
-#     questions = defaultdict()
-#
-# if 'data_storage/messages.json' in os.listdir():
-#     with open('data_storage/messages.json', 'r') as file:
-#         data = json.load(file, object_hook=lambda x: {int(k) if k.isdigit() else k: v for k, v in x.items()})
-#     messages = defaultdict(list, data)
-# else:
-#     messages = defaultdict(list)
-
 
 def load_json_file(file_path, default_factory, key_transform=int):
+    """Loads data from json file and returns default dictionary"""
     if file_path in os.listdir('data_storage'):
         with open(f'data_storage/{file_path}', 'r') as file:
             data = json.load(file, object_hook=lambda x: {key_transform(k) if k.isdigit() else k: v for k, v in x.items()})
@@ -58,12 +35,11 @@ def load_json_file(file_path, default_factory, key_transform=int):
 
 users_progress_weights = load_json_file('users_progress.json', None)
 questions = load_json_file('questions.json', None)
-print(questions)
 messages = load_json_file('messages.json', list)
-print(messages)
+
 
 # Main word data storage
-ru_list, en_list = create_lists()
+ru_list, en_list, ru_list_long, en_list_long = create_lists()
 ru_word_dict, en_word_dict, ru_dict_ind, en_dict_ind = create_word_dicts(ru_list=ru_list, en_list=en_list)
 ru_word_dict_numbers, en_word_dict_numbers = create_embedding_dicts(ru_word_dict=ru_word_dict,
                                                                     en_word_dict=en_word_dict)
@@ -72,6 +48,8 @@ en_string_search = StringSearch(en_list)
 
 
 async def choose_question(user_id):
+    """Returns a randomly chosen question taking into the account user's progress weights,
+     it's language, translation and length based on utf-8"""
     choice = random.randint(0, 1)
 
     if choice == 0:
@@ -90,6 +68,7 @@ async def choose_question(user_id):
 
 
 async def choose_options(question: str, question_language: str) -> list[str]:
+    """Returns a randomly chosen answer options"""
     def get_random_word(language):
         word_list = en_list if language == 'russian' else ru_list
         return random.choice(word_list)
@@ -108,16 +87,8 @@ async def choose_options(question: str, question_language: str) -> list[str]:
     return options
 
 
-async def save_number_users(file_path, content):
-    try:
-        async with aiofiles.open(file_path, 'w') as file:
-            await file.write(content)
-        print(f"Content saved to {file_path} asynchronously.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
-
 async def initiate_user_progress(user_id):
+    """Creates user progress weights array for a new user or extends the array if new words were added to the db"""
     if user_id not in users_progress_weights.keys():
         users_progress_weights[user_id] = [1 for _ in range(len(ru_list))]
     else:
@@ -126,6 +97,7 @@ async def initiate_user_progress(user_id):
 
 
 async def update_user_progress(user_id, question, language, answer_status):
+    """Updates progress weights after answering a question"""
     if user_id in users_progress_weights.keys():
         if language == 'russian':
             question_index = ru_dict_ind[question]
@@ -142,21 +114,25 @@ async def update_user_progress(user_id, question, language, answer_status):
 
 
 async def save_user_progress():
+    """Saves users' progress to a json file"""
     async with aiofiles.open('data_storage/users_progress.json', 'w') as file:
         await file.write(json.dumps(users_progress_weights))
 
 
 async def save_user_questions():
+    """Saves users' last questions to a json file"""
     async with aiofiles.open('data_storage/questions.json', 'w') as file:
         await file.write(json.dumps(questions))
 
 
 async def save_user_messages():
+    """Saves users' chat messages to a json file"""
     async with aiofiles.open('data_storage/messages.json', 'w') as file:
         await file.write(json.dumps(messages))
 
 
 async def inline_builder(question, question_language):
+    """Returns an InlineKeyboardBuilder based on a chosen question and options"""
     options = await choose_options(question=question, question_language=question_language)
 
     # Preparing new buttons
@@ -173,16 +149,16 @@ async def inline_builder(question, question_language):
 
 
 async def main() -> None:
+    """Initiates the bot"""
     await dp.start_polling(bot)
 
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
+    """Reacts to the Start command"""
     chat_id = message.chat.id
     user_id = message.from_user.id
-    unique_users.add(user_id)
     await initiate_user_progress(user_id)
-    await save_number_users(file_path='data_storage/unique_users.txt', content=f'{len(unique_users)}')
     initial_message = await bot.send_message(chat_id=chat_id,
                                              text="Плотный салам")
     messages[message.chat.id].append(initial_message.message_id)
@@ -194,9 +170,9 @@ async def start(message: types.Message):
 
 @dp.message(aiogram.filters.command.Command(commands='spin'))
 async def spin(message: types.Message):
+    """Reacts to the Spin command"""
     chat_id = message.chat.id
     user_id = message.from_user.id
-    unique_users.add(user_id)
 
     await initiate_user_progress(user_id)
 
@@ -225,6 +201,7 @@ async def spin(message: types.Message):
 
 @dp.message(aiogram.filters.command.Command(commands='save'))
 async def save_progress(message: types.Message):
+    """Reacts to the Save command"""
     await save_user_progress()
 
     chat_id = message.chat.id
@@ -235,6 +212,7 @@ async def save_progress(message: types.Message):
 
 @dp.message(aiogram.filters.command.Command(commands='instruct'))
 async def send_instructions(message: types.Message):
+    """Reacts to the Instruct command"""
     chat_id = message.chat.id
     text = """
 1. Для вызова игры в меню используйте функцию 'Крути барабан', которая запустит игру с выбором правильного перевода слова. Вам могут выпадать сообщения с идиомами после прокрутки барабана
@@ -252,7 +230,7 @@ async def send_instructions(message: types.Message):
 
 @dp.message()
 async def find_translation(message: types.message):
-    unique_users.add(message.from_user.id)
+    """Reacts to a user message"""
     chat_id = message.chat.id
 
     found_word, found_translation = await find_word(query=message.text,
@@ -281,6 +259,7 @@ async def find_translation(message: types.message):
 
 @dp.callback_query()
 async def check_translation(callback_query: types.callback_query):
+    """Checks a user answer on a poll"""
     user_translation = callback_query.data
     chat_id = callback_query.message.chat.id
     user_id = callback_query.from_user.id

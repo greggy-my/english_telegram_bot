@@ -10,15 +10,34 @@ import asyncio
 
 
 def create_lists():
-    df = pd.read_excel('data_storage/translation_pairs.xlsx')
-    en_list = [s.lower().capitalize().replace('.', '') for s in df['en'].to_list()]
-    ru_list = [s.lower().capitalize().replace('.', '') for s in df['ru'].to_list()]
+    """Returns en and ru lists of words from excel file"""
+    df1 = pd.read_excel('data_storage/translation_pairs.xlsx')
+    df2 = pd.read_excel('data_storage/extra.xlsx')
+
+    # Concatenate along rows
+    df = pd.concat([df1, df2], ignore_index=True)
+
+    indexes = set(index for index, s in enumerate(df['en'].to_list())
+                  if len(s.lower().capitalize().replace('.', '').encode('utf-8')) >= 62)
+    indexes = indexes.union(set(index for index, s in enumerate(df['ru'].to_list())
+                                if len(s.lower().capitalize().replace('.', '').encode('utf-8')) >= 62))
+
+    en_list = [s.lower().capitalize().replace('.', '') for index, s in enumerate(df['en'].to_list())
+               if index not in indexes]
+    ru_list = [s.lower().capitalize().replace('.', '') for index, s in enumerate(df['ru'].to_list())
+               if index not in indexes]
+
+    en_list_long = [s.lower().capitalize().replace('.', '') for index, s in enumerate(df['en'].to_list())
+                    if index in indexes]
+    ru_list_long = [s.lower().capitalize().replace('.', '') for index, s in enumerate(df['ru'].to_list())
+                    if index in indexes]
 
     del df
-    return ru_list, en_list
+    return ru_list, en_list, ru_list_long, en_list_long
 
 
 def create_word_dicts(ru_list: list, en_list: list) -> tuple[defaultdict, defaultdict, defaultdict, defaultdict]:
+    """Returns dictionaries which map en to ru, ru to en and each language to indexes"""
     # Создаем словарь с соответствиями слов и переводов
     ru_word_dict = defaultdict(lambda: None, zip(ru_list, en_list))
     en_word_dict = defaultdict(lambda: None, zip(en_list, ru_list))
@@ -28,7 +47,7 @@ def create_word_dicts(ru_list: list, en_list: list) -> tuple[defaultdict, defaul
 
 
 def detect_text_language(text: str) -> str:
-    """Returns a string with a language of a message"""
+    """Returns a language of a string (russian and english)"""
     # Define character sets for different languages
     russian_chars = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюя")
     english_chars = set("abcdefghijklmnopqrstuvwxyz")
@@ -47,7 +66,7 @@ def detect_text_language(text: str) -> str:
 
 
 def text_to_numbers(text: str, language: str) -> tuple:
-
+    """Returns a vector representation of a string based on letters"""
     if language == 'russian':
         alphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя "
         letter_vectors = {letter: i for i, letter in enumerate(alphabet)}
@@ -62,13 +81,13 @@ def text_to_numbers(text: str, language: str) -> tuple:
     for index, letter in enumerate(text.lower()):
         if letter in alphabet:
             vector_counts[letter_vectors[letter]] += 0
-            vector_positions[letter_vectors[letter]] += 1 / (1 + exp(2*index))
-    final_vector = tuple(vector_counts+vector_positions)
+            vector_positions[letter_vectors[letter]] += 1 / (1 + exp(2 * index))
+    final_vector = tuple(vector_counts + vector_positions)
     return final_vector
 
 
 def cosine_similarity(vector1: list, vector2: list) -> float:
-    """Returns the cosine of the angle between two vectors."""
+    """Returns the cosine similarity between two vectors"""
 
     dot_product = 0
     magnitude_vector1 = 0
@@ -110,6 +129,7 @@ def cosine_similarity(vector1: list, vector2: list) -> float:
 
 
 def create_embedding_dicts(ru_word_dict: dict, en_word_dict: dict) -> tuple[defaultdict, defaultdict]:
+    """Returns en and ru dictionaries with embeddings as keys and strings as values"""
     ru_word_dict_numbers = defaultdict(lambda: None)
     for ru_word, en_word in ru_word_dict.items():
         new_key = text_to_numbers(ru_word, language="russian")
@@ -123,8 +143,11 @@ def create_embedding_dicts(ru_word_dict: dict, en_word_dict: dict) -> tuple[defa
     return ru_word_dict_numbers, en_word_dict_numbers
 
 
-async def find_word(query: str, ru_word_dict_numbers:dict, ru_word_dict: dict, en_word_dict_numbers:dict, en_word_dict: dict)\
+async def find_word(query: str, ru_word_dict_numbers: dict, ru_word_dict: dict, en_word_dict_numbers: dict,
+                    en_word_dict: dict) \
         -> tuple[str, str] | tuple[None, None]:
+    """Returns the most similar word using cosine similarity of vector representations
+    , and it's translation to the query"""
 
     pattern = re.compile(r'^[0-9!@#$%^&*()_+=\-[\]{};:\'",.<>?/\\|`~]+$')
     if bool(pattern.match(query)):
@@ -168,6 +191,7 @@ class StringSearch:
         self.build_index(strings)
 
     def build_index(self, strings):
+        """Builds a hash map of words to strings based on the text population"""
         for string in strings:
             words = string.split()
             if ' ' in string:
@@ -180,6 +204,7 @@ class StringSearch:
                     self.string_dict[word] = [string]
 
     async def search(self, query):
+        """Returns the most similar result and probability"""
         query = query.lower()
         query = re.sub(r'[^a-zA-Zа-яА-Я ]', '', query)
         query_words = query.split()
@@ -203,10 +228,11 @@ class StringSearch:
 
 
 async def find_word_hash(query: str,
-                   ru_string_search: StringSearch,
-                   en_string_search: StringSearch,
-                   ru_word_dict: dict,
-                   en_word_dict: dict) -> tuple[str, str] | tuple[None, None]:
+                         ru_string_search: StringSearch,
+                         en_string_search: StringSearch,
+                         ru_word_dict: dict,
+                         en_word_dict: dict) -> tuple[str, str] | tuple[None, None]:
+    """Returns the most similar word using hash table of the text population, and it's translation to the query"""
 
     pattern = re.compile(r'^[0-9!@#$%^&*()_+=\-[\]{};:\'",.<>?/\\|`~]+$')
     if bool(pattern.match(query)):
@@ -235,6 +261,7 @@ if __name__ == "__main__":
     ru_string_search = StringSearch(ru_list)
     en_string_search = StringSearch(en_list)
 
+
     async def main():
         print(await find_word(query='to ',
                               ru_word_dict=ru_word_dict,
@@ -247,6 +274,6 @@ if __name__ == "__main__":
                                    en_word_dict=en_word_dict,
                                    ru_string_search=ru_string_search,
                                    en_string_search=en_string_search))
+
+
     asyncio.run(main())
-
-
