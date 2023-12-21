@@ -11,11 +11,7 @@ import asyncio
 
 def create_lists():
     """Returns en and ru lists of words from excel file"""
-    df1 = pd.read_excel('data_storage/translation_pairs.xlsx')
-    df2 = pd.read_excel('data_storage/extra.xlsx')
-
-    # Concatenate along rows
-    df = pd.concat([df1, df2], ignore_index=True)
+    df = pd.read_excel('data_storage/translation_pairs.xlsx')
 
     indexes = set(index for index, s in enumerate(df['en'].to_list())
                   if len(s.lower().capitalize().replace('.', '').encode('utf-8')) >= 62)
@@ -36,14 +32,19 @@ def create_lists():
     return ru_list, en_list, ru_list_long, en_list_long
 
 
-def create_word_dicts(ru_list: list, en_list: list) -> tuple[defaultdict, defaultdict, defaultdict, defaultdict]:
+def create_word_dicts(ru_list: list, en_list: list, ru_list_long: list, en_list_long: list)\
+        -> tuple[defaultdict, defaultdict, defaultdict, defaultdict, defaultdict, defaultdict]:
     """Returns dictionaries which map en to ru, ru to en and each language to indexes"""
     # Создаем словарь с соответствиями слов и переводов
     ru_word_dict = defaultdict(lambda: None, zip(ru_list, en_list))
     en_word_dict = defaultdict(lambda: None, zip(en_list, ru_list))
+
+    ru_word_dict_long = defaultdict(lambda: None, zip(ru_list_long, en_list_long))
+    en_word_dict_long = defaultdict(lambda: None, zip(en_list_long, ru_list_long))
+
     en_dict_ind = defaultdict(lambda: None, {value: index for index, value in enumerate(en_list)})
     ru_dict_ind = defaultdict(lambda: None, {value: index for index, value in enumerate(ru_list)})
-    return ru_word_dict, en_word_dict, ru_dict_ind, en_dict_ind
+    return ru_word_dict, en_word_dict, ru_dict_ind, en_dict_ind, ru_word_dict_long, en_word_dict_long
 
 
 def detect_text_language(text: str) -> str:
@@ -86,8 +87,11 @@ def text_to_numbers(text: str, language: str) -> tuple:
     return final_vector
 
 
-def cosine_similarity(vector1: list, vector2: list) -> float:
+def cosine_similarity(vector1: tuple, vector2: tuple) -> float:
     """Returns the cosine similarity between two vectors"""
+
+    vector1 = list(vector1)
+    vector2 = list(vector2)
 
     dot_product = 0
     magnitude_vector1 = 0
@@ -150,37 +154,31 @@ async def find_word(query: str, ru_word_dict_numbers: dict, ru_word_dict: dict, 
     , and it's translation to the query"""
 
     pattern = re.compile(r'^[0-9!@#$%^&*()_+=\-[\]{};:\'",.<>?/\\|`~]+$')
-    if bool(pattern.match(query)):
+
+    if pattern.match(query):
         return None, None
-    ru_word_dict_numbers = copy.deepcopy(ru_word_dict_numbers)
-    en_word_dict_numbers = copy.deepcopy(en_word_dict_numbers)
-    ru_word_dict = copy.copy(ru_word_dict)
-    en_word_dict = copy.copy(en_word_dict)
+
     language = detect_text_language(query)
+
+    if language != 'russian' and language != 'english':
+        return None, None
+
     query = text_to_numbers(query, language=language)
 
+    word_dict_numbers = ru_word_dict_numbers if language == 'russian' else en_word_dict_numbers
+    reverse_word_dict = en_word_dict if language == 'russian' else ru_word_dict
+
     max_sim = -1
-    if language == 'russian':
-        for ru_word, en_word in ru_word_dict_numbers.items():
-            key_array = ru_word
-            similarity = cosine_similarity(query, key_array)
+    chosen_value = None
+    chosen_key = None
 
-            if similarity > max_sim:
-                max_sim = similarity
-                chosen_value = en_word
-                chosen_key = en_word_dict[chosen_value]
+    for key, value in word_dict_numbers.items():
+        similarity = cosine_similarity(query, key)
 
-    elif language == 'english':
-        for en_word, ru_word in en_word_dict_numbers.items():
-            key_array = en_word
-            similarity = cosine_similarity(query, key_array)
-
-            if similarity > max_sim:
-                max_sim = similarity
-                chosen_value = ru_word
-                chosen_key = ru_word_dict[chosen_value]
-    else:
-        return None, None
+        if similarity > max_sim:
+            max_sim = similarity
+            chosen_value = value
+            chosen_key = reverse_word_dict[chosen_value]
 
     return chosen_key, chosen_value
 
@@ -254,8 +252,9 @@ async def find_word_hash(query: str,
 
 
 if __name__ == "__main__":
-    ru_list, en_list = create_lists()
-    ru_word_dict, en_word_dict, ru_dict_ind, en_dict_ind = create_word_dicts(ru_list=ru_list, en_list=en_list)
+    ru_list, en_list, ru_list_long, en_list_long = create_lists()
+    ru_word_dict, en_word_dict, ru_dict_ind, en_dict_ind, ru_word_dict_long, en_word_dict_long \
+        = create_word_dicts(ru_list=ru_list, en_list=en_list, ru_list_long=ru_list_long, en_list_long=en_list_long)
     ru_word_dict_numbers, en_word_dict_numbers = create_embedding_dicts(ru_word_dict=ru_word_dict,
                                                                         en_word_dict=en_word_dict)
     ru_string_search = StringSearch(ru_list)
