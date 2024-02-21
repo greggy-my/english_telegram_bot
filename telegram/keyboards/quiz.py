@@ -1,6 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from functions.quiz import choose_options
 
 
 def quiz_inline_keyboard(options: list[str]) -> InlineKeyboardBuilder:

@@ -1,10 +1,9 @@
 import random
-from collections import defaultdict
 from translations.translation import Translation
 from db.database_manager import MongoDBManager
 
 
-def choose_question(user_id: int) -> tuple[str, str, str]:
+async def choose_question(user_id: int) -> tuple[str, str, str]:
     """Returns a randomly chosen question"""
 
     language_choice = random.randint(0, 1)
@@ -16,8 +15,8 @@ def choose_question(user_id: int) -> tuple[str, str, str]:
 
     choice_map = options_mapping[language_choice]
     user_progress = await MongoDBManager.find_user_progress(user_id=user_id)
-    questions = user_progress[choice_map['user_progress']].keys()
-    weights = user_progress[choice_map['user_progress']].values()
+    questions = list(user_progress[choice_map['user_progress']].keys())
+    weights = list(user_progress[choice_map['user_progress']].values())
     question = random.choices(questions, weights=weights, k=1)[0]
     translation = choice_map['dict'][question]
     language = choice_map['language']

@@ -1,7 +1,7 @@
 import re
-from text_processing import TextProcessor
+from translations.text_processing import TextProcessor
 from fuzzywuzzy import fuzz
-from translation import Translation
+from translations.translation import Translation
 
 
 class EmbeddingSearch:

@@ -1,6 +1,7 @@
 from aiogram.filters import BaseFilter
-from bot import ADMIN
 from aiogram.types import Message
+import os
+from telegram.loader import ADMIN
 
 
 class IsAdmin(BaseFilter):

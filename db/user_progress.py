@@ -1,7 +1,7 @@
 from collections import defaultdict
 import asyncio
 from translations.translation import Translation
-from database_manager import MongoDBManager
+from db.database_manager import MongoDBManager
 
 
 async def actualise_users_progress() -> None:

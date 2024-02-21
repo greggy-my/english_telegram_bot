@@ -1,21 +1,32 @@
 from aiogram import Bot
 from aiogram.types import Message, CallbackQuery
-from translations.translation import Translation
+from aiogram.fsm.context import FSMContext
+
 from telegram.keyboards.quiz import quiz_inline_keyboard
 from functions.quiz import choose_question, choose_options
+
 from db.database_manager import MongoDBManager
 from db.user_progress import update_user_progress
 
+from telegram.states.quiz import Quiz
+from telegram.keyboards.menu import main_menu, back_to_menu
 
-async def spin(message: Message) -> None:
+
+async def spin(message: Message, state: FSMContext) -> None:
+    initial_text = 'Ты в режиме поиска Квиза'
+    await message.answer(text=initial_text, reply_markup=back_to_menu().as_markup(resize_keyboard=True))
+    await state.set_state(Quiz.back_to_menu)
+
     user_id = message.from_user.id
     chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
 
     # Searching for a new question
-    question, translation, question_language = choose_question(user_id=user_id)
+    question, translation, question_language = await choose_question(user_id=user_id)
     # Preparing new options
     options, right_option_index = choose_options(translation=translation, question_language=question_language)
-    chat_data['spin_correct_answer'].append(right_option_index)
+    chat_data['spin_correct_index'] = right_option_index
+    chat_data['spin_question'] = question
+    chat_data['spin_question_language'] = question_language
 
     # Creating a builder
     builder = quiz_inline_keyboard(options=options)
@@ -50,30 +61,32 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
             except Exception:
                 continue
 
-        messages = []
+        chat_data['messages'] = []
 
         await update_user_progress(user_id=user_id,
                                    question_language=question_language,
                                    question=question,
                                    answer_status='right')
 
-        greet_message = await callback_query.message.reply(text=f"Правильно, Валерий Игоревич оценил")
-        messages.append(greet_message.message_id)
+        greet_message = await bot.send_message(chat_id=chat_id, text=f"Правильно, Валерий Игоревич оценил")
+        chat_data['messages'].append(greet_message.message_id)
 
         # Searching for a new question
-        question, translation, question_language = choose_question(user_id=user_id)
+        question, translation, question_language = await choose_question(user_id=user_id)
 
         # Preparing new options
         options, right_option_index = choose_options(translation=translation, question_language=question_language)
-        chat_data['spin_correct_answer'] = right_option_index
+        chat_data['spin_correct_index'] = right_option_index
+        chat_data['spin_question'] = question
+        chat_data['spin_question_language'] = question_language
 
         # Creating a builder
         builder = quiz_inline_keyboard(options=options)
 
         # Sending new markup
-        new_question_message = await callback_query.message.answer(text=f"Как переводится:\n\n{question}",
-                                                                   reply_markup=builder.as_markup())
-        messages.append(new_question_message.message_id)
+        new_question_message = await bot.send_message(chat_id=chat_id, text=f"Как переводится:\n\n{question}",
+                                                      reply_markup=builder.as_markup())
+        chat_data['messages'] .append(new_question_message.message_id)
 
         await MongoDBManager.update_chat_data(user_id=user_id, new_data=chat_data)
 
@@ -86,6 +99,22 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
                                    question=question,
                                    answer_status='wrong')
 
-        messages.append(wrong_answer_message.message_id)
+        chat_data['messages'] .append(wrong_answer_message.message_id)
+
+        await MongoDBManager.update_chat_data(user_id=user_id, new_data=chat_data)
 
 
+async def cancel_quiz(message: Message, state: FSMContext, bot: Bot):
+    chat_data = await MongoDBManager.find_chat_data(user_id=message.from_user.id)
+
+    for message_id in chat_data['messages']:
+        try:
+            await bot.delete_message(chat_id=message.chat.id, message_id=message_id)
+        except Exception:
+            continue
+
+    await message.answer(
+        text='Обратно в главное меню',
+        reply_markup=main_menu().as_markup()
+    )
+    await state.clear()

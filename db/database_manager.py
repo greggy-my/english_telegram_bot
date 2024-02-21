@@ -1,5 +1,9 @@
 import motor.motor_asyncio
 import asyncio
+from typing import Annotated
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class MongoDBManager:
@@ -64,6 +68,48 @@ class MongoDBManager:
         collection = cls.db[collection_name]
         result = await collection.delete_many({})
         return result.deleted_count
+
+
+engine = create_async_engine(f"sqlite+aiosqlite:///db/feedback.db")
+new_session = async_sessionmaker(engine, expire_on_commit=False)
+intpk = Annotated[int, mapped_column(primary_key=True)]
+
+
+async def create_tables():
+    async with engine.begin() as conn:
+        await conn.run_sync(Model.metadata.create_all)
+
+
+class Model(DeclarativeBase):
+    pass
+
+
+class FeedbackTable(Model):
+    __tablename__ = "feedback"
+    feedback_id: Mapped[intpk]
+    feedback: Mapped[str]
+
+
+class FeedbackRepository:
+    @classmethod
+    async def add_data(cls, data: dict) -> int:
+        async with new_session() as session:
+            new_feedback = FeedbackTable(**data)
+            session.add(new_feedback)
+            await session.flush()
+            await session.commit()
+            return new_feedback.feedback_id
+
+    @classmethod
+    async def get_data(cls) -> list[dict]:
+        async with new_session() as session:
+            query = select(FeedbackTable)
+            result = await session.execute(query)
+            feedback_models = result.scalars().all()
+            feedback_data = [feedback.__dict__ for feedback in feedback_models]
+            for feedback in feedback_data:
+                feedback.pop('_sa_instance_state', None)
+            return feedback_data
 
 
 if __name__ == '__main__':

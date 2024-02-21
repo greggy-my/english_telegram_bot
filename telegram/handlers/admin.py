@@ -1,14 +1,13 @@
 import aiogram.exceptions
 from aiogram.types import Message
 from aiogram import Bot
-from bot import ADMIN, States
-from telegram.keyboards.admin import admin_keyboard
+from telegram.loader import ADMIN, States
 
 
 async def start_bot(bot: Bot) -> None:
     """Sends the start bot message to admins"""
     try:
-        await bot.send_message(ADMIN, text='Бот запущен', reply_markup=admin_keyboard().as_markup(resize_keyboard=True))
+        await bot.send_message(ADMIN, text='Бот запущен')
     except aiogram.exceptions.TelegramBadRequest as se:
         print(f'Error while sending start message to admin ({ADMIN}): {se}')
 
