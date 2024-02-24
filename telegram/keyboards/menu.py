@@ -10,6 +10,8 @@ def main_menu():
         types.KeyboardButton(text='Правописание'),
         types.KeyboardButton(text='Обратная связь'),
     )
+    builder.adjust(2, 2)
+
     return builder
 
 

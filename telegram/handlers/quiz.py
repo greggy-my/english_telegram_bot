@@ -13,12 +13,13 @@ from telegram.keyboards.menu import main_menu, back_to_menu
 
 
 async def spin(message: Message, state: FSMContext) -> None:
-    initial_text = 'Ты в режиме поиска Квиза'
-    await message.answer(text=initial_text, reply_markup=back_to_menu().as_markup(resize_keyboard=True))
-    await state.set_state(Quiz.back_to_menu)
-
     user_id = message.from_user.id
     chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
+    initial_text = 'Ты в режиме поиска Квиза'
+    await message.answer(
+        text=initial_text,
+        reply_markup=back_to_menu().as_markup(resize_keyboard=True)
+    )
 
     # Searching for a new question
     question, translation, question_language = await choose_question(user_id=user_id)
@@ -34,12 +35,13 @@ async def spin(message: Message, state: FSMContext) -> None:
     # Sending new message
     game_message = await message.answer("Как переводится:\n\n"
                                         f"{question}",
-                                        reply_markup=builder.as_markup())
+                                        reply_markup=builder.as_markup(resize_keyboard=True))
 
     chat_data['messages'].append(game_message.message_id)
     chat_data['messages'].append(message.message_id)
 
     await MongoDBManager.update_chat_data(user_id=user_id, new_data=chat_data)
+    await state.set_state(Quiz.back_to_menu)
 
 
 async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
@@ -68,9 +70,6 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
                                    question=question,
                                    answer_status='right')
 
-        greet_message = await bot.send_message(chat_id=chat_id, text=f"Правильно, Валерий Игоревич оценил")
-        chat_data['messages'].append(greet_message.message_id)
-
         # Searching for a new question
         question, translation, question_language = await choose_question(user_id=user_id)
 
@@ -85,7 +84,7 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
 
         # Sending new markup
         new_question_message = await bot.send_message(chat_id=chat_id, text=f"Как переводится:\n\n{question}",
-                                                      reply_markup=builder.as_markup())
+                                                      reply_markup=builder.as_markup(resize_keyboard=True))
         chat_data['messages'] .append(new_question_message.message_id)
 
         await MongoDBManager.update_chat_data(user_id=user_id, new_data=chat_data)
@@ -115,6 +114,6 @@ async def cancel_quiz(message: Message, state: FSMContext, bot: Bot):
 
     await message.answer(
         text='Обратно в главное меню',
-        reply_markup=main_menu().as_markup()
+        reply_markup=main_menu().as_markup(resize_keyboard=True)
     )
     await state.clear()

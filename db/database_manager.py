@@ -13,6 +13,13 @@ class MongoDBManager:
     db = client[db_name]
 
     @classmethod
+    async def find(cls, collection_name, query_data):
+        collection = cls.db[collection_name]
+        cursor = collection.find(*query_data)
+        documents = await cursor.to_list(length=None)
+        return documents
+
+    @classmethod
     async def find_all_documents(cls, collection_name):
         collection = cls.db[collection_name]
         cursor = collection.find({})
@@ -122,7 +129,7 @@ if __name__ == '__main__':
         # await MongoDBManager.insert_user_progress(user_progress)
         #
         chat_data = {'chat_id': 456, 'messages': [12, 323, 42], 'spin_correct_index': 1, 'spin_question': '',
-                     'spin_question_language': ''}
+                     'spin_question_language': '', 'write_translation_question': '', 'write_translation_answer': ''}
         # await MongoDBManager.insert_chat_data(chat_data)
         #
         # # Find all documents

@@ -26,7 +26,7 @@ async def start(message: Message) -> None:
     chat_id = message.chat.id
     await initiate_user_progress(user_id=user_id)
     await initiate_chat_data(user_id=user_id, chat_id=chat_id)
-    await message.answer(text="Плотный салам", reply_markup=main_menu().as_markup())
+    await message.answer(text="Плотный салам", reply_markup=main_menu().as_markup(resize_keyboard=True))
 
 
 async def init_feedback(message: Message, state: FSMContext) -> None:
@@ -50,7 +50,7 @@ async def approve_feedback(message: Message, state: FSMContext):
     await FeedbackRepository.add_data({'feedback': user_data['feedback_text']})
     await message.answer(
         text='Спасибо за обратную связь!',
-        reply_markup=main_menu().as_markup()
+        reply_markup=main_menu().as_markup(resize_keyboard=True)
     )
 
     await state.clear()
@@ -59,7 +59,7 @@ async def approve_feedback(message: Message, state: FSMContext):
 async def cancel_feedback(message: Message, state: FSMContext):
     await message.answer(
         text='Обратная связь отменена',
-        reply_markup=main_menu().as_markup()
+        reply_markup=main_menu().as_markup(resize_keyboard=True)
     )
 
     await state.clear()
