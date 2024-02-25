@@ -11,16 +11,16 @@ from telegram.keyboards.menu import main_menu
 
 async def send_question(message: Message):
     user_id = message.from_user.id
-    question, translation = choose_ru_question()
-
     chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
+    chosen_unit = chat_data['chosen_unit']
+    question, translation = choose_ru_question(chosen_unit=chosen_unit)
 
     chat_data['write_translation_question'] = question
     chat_data['write_translation_answer'] = translation
 
     await MongoDBManager.update_chat_data(user_id=user_id, new_data=chat_data)
 
-    question_text = f'Напиши перевод слова "{question}" на Английском'
+    question_text = f'Напиши перевод слова "{question.capitalize()}" на Английском'
     await message.answer(text=question_text,
                          reply_markup=write_translation_menu().as_markup(resize_keyboard=True))
 
@@ -40,7 +40,7 @@ async def check_answer(message: Message):
 
     right_answer = chat_data['write_translation_answer']
 
-    if user_answer == right_answer:
+    if user_answer.lower().strip() == right_answer.lower():
 
         right_text = f'Молодец, все верно!'
         await message.answer(text=right_text)
@@ -58,7 +58,7 @@ async def show_right_translation(message: Message):
     chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
     right_answer = chat_data['write_translation_answer']
 
-    right_answer_text = f'Правильный ответ: {right_answer}'
+    right_answer_text = f'Правильный ответ: {right_answer.capitalize()}'
     await message.answer(text=right_answer_text)
 
 

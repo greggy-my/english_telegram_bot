@@ -1,18 +1,16 @@
 import pandas as pd
 import os
 from collections import defaultdict
-from translations.text_processing import TextProcessor
 
 
 class Translation:
+    units = set()
+
     ru_list = []
     en_list = []
 
-    ru_word_dict = defaultdict(lambda: None)
-    en_word_dict = defaultdict(lambda: None)
-
-    ru_word_numbers_dict = defaultdict(lambda: None)
-    en_word_numbers_dict = defaultdict(lambda: None)
+    ru_word_dict = defaultdict()
+    en_word_dict = defaultdict()
 
     ru_hash_dict = defaultdict(lambda: [])
     en_hash_dict = defaultdict(lambda: [])
@@ -25,33 +23,23 @@ class Translation:
             for index, row in translations_df.iterrows():
                 row_dict = row.to_dict()
 
+                unit = str(row_dict.get('unit')).lower()
                 russian_word = str(row_dict.get('ru')).lower()
                 english_word = str(row_dict.get('en')).lower()
                 assert isinstance(russian_word, str), f'Russian word {russian_word} is not str'
                 assert isinstance(english_word, str), f'English word {english_word} is not str'
 
-                cls.ru_list.append(russian_word)
-                cls.en_list.append(english_word)
+                cls.units.add(unit)
+                cls.ru_list.append(f'{unit}_{russian_word}')
+                cls.en_list.append(f'{unit}_{english_word}')
                 cls.en_word_dict[english_word] = russian_word
                 cls.ru_word_dict[russian_word] = english_word
 
             cls.build_hash_dict()
-
-            cls.build_embedding_dicts()
+            cls.units = sorted(cls.units)
 
         else:
             raise Exception('No translations file')
-
-    @classmethod
-    def build_embedding_dicts(cls):
-        """Returns en and ru dictionaries with embeddings as keys and strings as values"""
-        for ru_word, en_word in cls.ru_word_dict.items():
-            new_key = TextProcessor.text_to_numbers(ru_word, language="russian")
-            cls.ru_word_numbers_dict[new_key] = en_word
-
-        for en_word, ru_word in cls.en_word_dict.items():
-            new_key = TextProcessor.text_to_numbers(en_word, language="english")
-            cls.en_word_numbers_dict[new_key] = ru_word
 
     @classmethod
     def build_hash_dict(cls):
@@ -69,10 +57,10 @@ class Translation:
                         hash_dict[word] = [splitted_word]
 
         # Processing Russian list
-        process_words(cls.ru_list, cls.ru_hash_dict)
+        process_words(cls.ru_word_dict.keys(), cls.ru_hash_dict)
 
         # Processing English list
-        process_words(cls.en_list, cls.en_hash_dict)
+        process_words(cls.en_word_dict.keys(), cls.en_hash_dict)
 
 
 if __name__ == '__main__':

@@ -9,8 +9,9 @@ def main_menu():
         types.KeyboardButton(text='Квиз'),
         types.KeyboardButton(text='Правописание'),
         types.KeyboardButton(text='Обратная связь'),
+        types.KeyboardButton(text='Выбрать Юнит'),
     )
-    builder.adjust(2, 2)
+    builder.adjust(2, 2, 1)
 
     return builder
 

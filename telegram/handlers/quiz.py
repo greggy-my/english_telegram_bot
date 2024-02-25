@@ -15,16 +15,20 @@ from telegram.keyboards.menu import main_menu, back_to_menu
 async def spin(message: Message, state: FSMContext) -> None:
     user_id = message.from_user.id
     chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
-    initial_text = 'Ты в режиме поиска Квиза'
+    chosen_unit = chat_data['chosen_unit']
+    initial_text = 'Ты в режиме Квиза'
     await message.answer(
         text=initial_text,
         reply_markup=back_to_menu().as_markup(resize_keyboard=True)
     )
 
     # Searching for a new question
-    question, translation, question_language = await choose_question(user_id=user_id)
+    question_unit, question, translation, question_language =\
+        await choose_question(user_id=user_id, chosen_unit=chosen_unit)
+
     # Preparing new options
     options, right_option_index = choose_options(translation=translation, question_language=question_language)
+    chat_data['spin_question_unit'] = question_unit
     chat_data['spin_correct_index'] = right_option_index
     chat_data['spin_question'] = question
     chat_data['spin_question_language'] = question_language
@@ -33,8 +37,8 @@ async def spin(message: Message, state: FSMContext) -> None:
     builder = quiz_inline_keyboard(options=options)
 
     # Sending new message
-    game_message = await message.answer("Как переводится:\n\n"
-                                        f"{question}",
+    game_message = await message.answer('Как переводится:\n'
+                                        f'"{question.capitalize()}"',
                                         reply_markup=builder.as_markup(resize_keyboard=True))
 
     chat_data['messages'].append(game_message.message_id)
@@ -52,8 +56,10 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
     chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
     right_option_index = chat_data['spin_correct_index']
     messages = chat_data['messages']
+    chosen_unit = chat_data['chosen_unit']
     question = chat_data['spin_question']
     question_language = chat_data['spin_question_language']
+    question_unit = chat_data['spin_question_unit']
 
     if user_answer == right_option_index:
         # Deleting previous messages
@@ -68,13 +74,16 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
         await update_user_progress(user_id=user_id,
                                    question_language=question_language,
                                    question=question,
+                                   question_unit=question_unit,
                                    answer_status='right')
 
         # Searching for a new question
-        question, translation, question_language = await choose_question(user_id=user_id)
+        question_unit, question, translation, question_language =\
+            await choose_question(user_id=user_id, chosen_unit=chosen_unit)
 
         # Preparing new options
         options, right_option_index = choose_options(translation=translation, question_language=question_language)
+        chat_data['spin_question_unit'] = question_unit
         chat_data['spin_correct_index'] = right_option_index
         chat_data['spin_question'] = question
         chat_data['spin_question_language'] = question_language
@@ -83,7 +92,8 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
         builder = quiz_inline_keyboard(options=options)
 
         # Sending new markup
-        new_question_message = await bot.send_message(chat_id=chat_id, text=f"Как переводится:\n\n{question}",
+        new_question_message = await bot.send_message(chat_id=chat_id,
+                                                      text=f'Как переводится:\n"{question.capitalize()}"',
                                                       reply_markup=builder.as_markup(resize_keyboard=True))
         chat_data['messages'] .append(new_question_message.message_id)
 
@@ -92,10 +102,11 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
     else:
         # Wrong answer message
         wrong_answer_message = await bot.send_message(chat_id=callback_query.message.chat.id,
-                                                      text=f"Неверно. Не разочаровывай, выбери еще раз")
+                                                      text=f'Неверно. Не разочаровывай, выбери еще раз')
         await update_user_progress(user_id=user_id,
                                    question_language=question_language,
                                    question=question,
+                                   question_unit=question_unit,
                                    answer_status='wrong')
 
         chat_data['messages'] .append(wrong_answer_message.message_id)

@@ -4,7 +4,6 @@ import sys
 from aiogram import F, flags
 from aiogram.filters import CommandStart, Command, and_f, or_f
 
-
 from telegram.handlers import admin, user_commands
 from telegram.filters.admin import IsAdmin
 from telegram.utils.bot_param_register import set_description, set_user_commands
@@ -19,8 +18,10 @@ from telegram.states.feedback import GetFeedback
 from telegram.states.search import Search
 from telegram.states.quiz import Quiz
 from telegram.states.write_translation import WriteTranslation
-from telegram.handlers.write_translation import init_write_translation, send_question, check_answer,\
+from telegram.states.choose_unit import ChooseUnit
+from telegram.handlers.write_translation import init_write_translation, send_question, check_answer, \
     show_right_translation, cancel_write_translation
+from telegram.handlers.choose_unit import init_choose_unit, choose_unit, cancel_choose_unit, approve_choose_unit
 from telegram.middleware.chat_action import ChatActionMiddleware
 
 
@@ -40,6 +41,7 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         await bot.session.close()
+
 
 # middleware
 dp.message.middleware.register(ChatActionMiddleware())
@@ -71,7 +73,6 @@ dp.message.register(init_search, F.text == 'Поиск')
 dp.message.register(cancel_search, and_f(F.text == 'Назад в меню', Search.back_to_menu))
 dp.message.register(find_translation, and_f(F.text, Search.back_to_menu), flags={'chat_action': 'typing'})
 
-
 # write translation
 dp.message.register(init_write_translation,
                     F.text == 'Правописание')
@@ -84,6 +85,13 @@ dp.message.register(show_right_translation,
 dp.message.register(check_answer,
                     and_f(F.text, WriteTranslation.back_to_menu))
 
+# choose unit
+dp.message.register(init_choose_unit, F.text == 'Выбрать Юнит')
+dp.message.register(cancel_choose_unit, and_f(or_f(ChooseUnit.unit, ChooseUnit.approve),
+                                              F.text == 'Отменить'))
+dp.message.register(approve_choose_unit, and_f(ChooseUnit.approve,
+                                                          F.text == 'Подтвердить'))
+dp.callback_query.register(choose_unit, or_f(ChooseUnit.unit, ChooseUnit.approve))
 
 if __name__ == '__main__':
     asyncio.run(main())

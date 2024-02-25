@@ -7,7 +7,7 @@ def quiz_inline_keyboard(options: list[str]) -> InlineKeyboardBuilder:
     # Preparing new buttons
     buttons = []
     for index, option in enumerate(options):
-        buttons.append(InlineKeyboardButton(text=option, callback_data=str(index)))
+        buttons.append(InlineKeyboardButton(text=option.capitalize(), callback_data=str(index)))
 
     markup = InlineKeyboardMarkup(inline_keyboard=[buttons])
     builder = InlineKeyboardBuilder.from_markup(markup)
