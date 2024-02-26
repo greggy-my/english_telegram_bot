@@ -1,7 +1,7 @@
 import re
-from translations.text_processing import TextProcessor
 from fuzzywuzzy import fuzz
 from translations.translation import Translation
+from translations.text_processing import TextProcessor
 
 
 class HashSearch:

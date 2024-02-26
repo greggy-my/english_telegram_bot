@@ -4,10 +4,11 @@ from typing import Annotated
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from config import mongo_db_url
 
 
 class MongoDBManager:
-    uri = 'mongodb://localhost:27017'
+    uri = mongo_db_url
     db_name = 'bot'
     client = motor.motor_asyncio.AsyncIOMotorClient(uri)
     db = client[db_name]
@@ -77,7 +78,7 @@ class MongoDBManager:
         return result.deleted_count
 
 
-engine = create_async_engine(f"sqlite+aiosqlite:///db/feedback.db")
+engine = create_async_engine(f"sqlite+aiosqlite:///db/data/feedback.db")
 new_session = async_sessionmaker(engine, expire_on_commit=False)
 intpk = Annotated[int, mapped_column(primary_key=True)]
 

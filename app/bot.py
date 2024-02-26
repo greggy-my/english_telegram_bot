@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import sys
-from aiogram import F, flags
+from aiogram import F
 from aiogram.filters import CommandStart, Command, and_f, or_f
 
 from telegram.handlers import admin, user_commands

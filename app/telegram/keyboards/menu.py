@@ -8,8 +8,8 @@ def main_menu():
         types.KeyboardButton(text='Поиск'),
         types.KeyboardButton(text='Квиз'),
         types.KeyboardButton(text='Правописание'),
-        types.KeyboardButton(text='Обратная связь'),
         types.KeyboardButton(text='Выбрать Юнит'),
+        types.KeyboardButton(text='Обратная связь')
     )
     builder.adjust(2, 2, 1)
 

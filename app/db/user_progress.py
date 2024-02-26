@@ -1,4 +1,3 @@
-from collections import defaultdict
 import asyncio
 from translations.translation import Translation
 from db.database_manager import MongoDBManager

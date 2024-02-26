@@ -1,6 +1,5 @@
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
-import os
 from telegram.loader import ADMIN
 
 

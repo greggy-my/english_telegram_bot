@@ -1,6 +1,6 @@
 from aiogram.types import Message
-from translations.search_alg import HashSearch
 from aiogram.fsm.context import FSMContext
+from translations.search_alg import HashSearch
 from telegram.states.search import Search
 from telegram.keyboards.menu import main_menu, back_to_menu
 
@@ -24,7 +24,8 @@ async def find_translation(message: Message) -> None:
         await message.reply(text=f"Ошибочка вышла:\n\nНе смог найти")
 
     else:
-        await message.reply(text=f"Ты это искал:\n\nФраза: {found_word_hash}\n\nПеревод: {found_translation_hash}")
+        await message.reply(text=f"Ты это искал:\n\nФраза: {found_word_hash.capitalize()}"
+                                 f"\n\nПеревод: {found_translation_hash.capitalize()}")
 
 
 async def cancel_search(message: Message, state: FSMContext):

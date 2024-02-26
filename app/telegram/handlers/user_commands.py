@@ -1,5 +1,5 @@
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.types import Message
 from db.database_manager import FeedbackRepository
 from db.user_progress import initiate_user_progress
 from db.chat_data import initiate_chat_data
