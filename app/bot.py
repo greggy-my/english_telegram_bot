@@ -5,7 +5,6 @@ from aiogram import F
 from aiogram.filters import CommandStart, Command, and_f, or_f
 
 from telegram.handlers import admin, user_commands
-from telegram.filters.admin import IsAdmin
 from telegram.utils.bot_param_register import set_description, set_user_commands
 from telegram.loader import dp, bot
 
@@ -49,7 +48,6 @@ dp.message.middleware.register(ChatActionMiddleware())
 # admin
 dp.startup.register(admin.start_bot)
 dp.shutdown.register(admin.stop_bot)
-dp.message.register(admin.maintenance, and_f(IsAdmin(), F.text == 'Тех обслуживание'))
 
 # users commands
 dp.message.register(user_commands.start, CommandStart())

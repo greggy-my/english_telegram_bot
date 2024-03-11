@@ -15,6 +15,8 @@ def inline_choose_unit():
     markup = InlineKeyboardMarkup(inline_keyboard=[buttons])
     builder = InlineKeyboardBuilder.from_markup(markup)
 
+    builder.adjust(*(1 for _ in range(1, len(Translation.units)+1)))
+
     return builder
 
 

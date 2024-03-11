@@ -26,8 +26,9 @@ async def send_question(message: Message):
 
 
 async def init_write_translation(message: Message, state: FSMContext) -> None:
-    initial_text = 'Ты в режиме правописания'
+    initial_text = '<i>В режиме Правописание</i>'
     await message.answer(text=initial_text, reply_markup=write_translation_menu().as_markup(resize_keyboard=True))
+
     await state.set_state(WriteTranslation.back_to_menu)
     await send_question(message=message)
 
@@ -63,9 +64,6 @@ async def show_right_translation(message: Message):
 
 
 async def cancel_write_translation(message: Message, state: FSMContext):
-    await message.answer(
-        text='Обратно в главное меню',
-        reply_markup=main_menu().as_markup(resize_keyboard=True)
-    )
+    await message.answer(text='<i>Обратно в меню</i>', reply_markup=main_menu().as_markup(resize_keyboard=True))
 
     await state.clear()

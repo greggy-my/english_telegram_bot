@@ -10,10 +10,8 @@ services:
       - type: bind
         source: ./app/db/data/redis.conf
         target: /usr/local/etc/redis/redis.conf
-      - type: volume
-        source: redis
-        target: /db/data/redis
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+      - ./app/db/data/redis:/data
+    entrypoint: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     networks:
       - app_network
 
@@ -23,7 +21,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo:/db/data/mongo
+      - ./app/db/data/mongo/db:/data/db
     networks:
       - app_network
 

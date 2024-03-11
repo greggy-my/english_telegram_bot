@@ -9,7 +9,7 @@ from config import mongo_db_url
 
 class MongoDBManager:
     uri = mongo_db_url
-    db_name = 'bot'
+    db_name = 'english_bot'
     client = motor.motor_asyncio.AsyncIOMotorClient(uri)
     db = client[db_name]
 

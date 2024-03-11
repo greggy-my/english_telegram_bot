@@ -16,11 +16,8 @@ async def spin(message: Message, state: FSMContext) -> None:
     user_id = message.from_user.id
     chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
     chosen_unit = chat_data['chosen_unit']
-    initial_text = 'Ты в режиме Квиза'
-    await message.answer(
-        text=initial_text,
-        reply_markup=back_to_menu().as_markup(resize_keyboard=True)
-    )
+
+    await message.answer(text='<i>В режиме Квиз</i>', reply_markup=back_to_menu().as_markup(resize_keyboard=True))
 
     # Searching for a new question
     question_unit, question, translation, question_language =\
@@ -102,7 +99,7 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
     else:
         # Wrong answer message
         wrong_answer_message = await bot.send_message(chat_id=callback_query.message.chat.id,
-                                                      text=f'Неверно. Не разочаровывай, выбери еще раз')
+                                                      text=f'Неверно, выбери еще раз')
         await update_user_progress(user_id=user_id,
                                    question_language=question_language,
                                    question=question,
@@ -115,7 +112,8 @@ async def check_translation(callback_query: CallbackQuery, bot: Bot) -> None:
 
 
 async def cancel_quiz(message: Message, state: FSMContext, bot: Bot):
-    chat_data = await MongoDBManager.find_chat_data(user_id=message.from_user.id)
+    user_id = message.from_user.id
+    chat_data = await MongoDBManager.find_chat_data(user_id=user_id)
 
     for message_id in chat_data['messages']:
         try:
@@ -123,8 +121,8 @@ async def cancel_quiz(message: Message, state: FSMContext, bot: Bot):
         except Exception:
             continue
 
-    await message.answer(
-        text='Обратно в главное меню',
-        reply_markup=main_menu().as_markup(resize_keyboard=True)
-    )
+    await MongoDBManager.update_chat_data(user_id=user_id, new_data={'messages': []})
+
+    await message.answer(text='<i>Обратно в меню</i>', reply_markup=main_menu().as_markup(resize_keyboard=True))
+
     await state.clear()
