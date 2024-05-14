@@ -1,8 +1,8 @@
 from aiogram import types
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from translations.translation import Translation
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+
+from app.translations.translation import Translation
 
 
 def inline_choose_unit():

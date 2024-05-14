@@ -1,14 +1,18 @@
-import motor.motor_asyncio
 import asyncio
 from typing import Annotated
+
+import motor.motor_asyncio
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from config import mongo_db_url
+
+from app.config import settings
 
 
 class MongoDBManager:
-    uri = mongo_db_url
+    uri = settings.MONGO_URL
     db_name = 'english_bot'
     client = motor.motor_asyncio.AsyncIOMotorClient(uri)
     db = client[db_name]
@@ -78,14 +82,37 @@ class MongoDBManager:
         return result.deleted_count
 
 
-engine = create_async_engine(f"sqlite+aiosqlite:///db/data/feedback.db")
-new_session = async_sessionmaker(engine, expire_on_commit=False)
+class ChatData(BaseModel):
+    user_id: int
+    chat_id: int
+    messages: List[str] = Field(default_factory=list)
+    chosen_unit: Optional[str] = None
+    spin_correct_index: Optional[int] = None
+    spin_question: Optional[str] = None
+    spin_question_language: Optional[str] = None
+    spin_question_unit: Optional[str] = None
+    write_translation_question: Optional[str] = None
+    write_translation_answer: Optional[str] = None
+    write_translation_unit: Optional[str] = None
+
+class UserProgress(BaseModel):
+    user_id: int
+    en_progress: Dict[str, int]
+    ru_progress: Dict[str, int]
+
+
+async_engine = create_async_engine(settings.POSTGRES_URL)
+new_session = async_sessionmaker(async_engine, expire_on_commit=False)
 intpk = Annotated[int, mapped_column(primary_key=True)]
 
 
 async def create_tables():
-    async with engine.begin() as conn:
+    async with async_engine.begin() as conn:
         await conn.run_sync(Model.metadata.create_all)
+
+async def drop_tables():
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Model.metadata.drop_all)
 
 
 class Model(DeclarativeBase):
@@ -97,6 +124,10 @@ class FeedbackTable(Model):
     feedback_id: Mapped[intpk]
     feedback: Mapped[str]
 
+class MagaTable(Model):
+    __tablename__ = "maga"
+    feedback_id: Mapped[intpk]
+    feed: Mapped[str]
 
 class FeedbackRepository:
     @classmethod
@@ -125,7 +156,7 @@ if __name__ == '__main__':
 
         await MongoDBManager.delete_all_documents('user_progress')
         await MongoDBManager.delete_all_documents('chat_data')
-        # # Example data
+        # # Example db_data
         # user_progress = {'user_id': 456, 'en_progress': {'bye': 0.01, 'hello': 0.05}, 'ru_progress': {'пока': 0.01, 'привет': 0.05}}
         # await MongoDBManager.insert_user_progress(user_progress)
         #

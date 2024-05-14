@@ -1,6 +1,7 @@
 import random
-from translations.translation import Translation
-from db.database_manager import MongoDBManager
+
+from app.db.database_manager import MongoDBManager
+from app.translations.translation import Translation
 
 
 async def choose_question(user_id: int, chosen_unit: str) -> tuple[str, str, str, str]:

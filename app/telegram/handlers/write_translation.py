@@ -1,12 +1,11 @@
-from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
 
-from db.database_manager import MongoDBManager
-from functions.write_translation import choose_ru_question
-
-from telegram.states.write_translation import WriteTranslation
-from telegram.keyboards.write_translation import write_translation_menu
-from telegram.keyboards.menu import main_menu
+from app.db.database_manager import MongoDBManager
+from app.functions.write_translation import choose_ru_question
+from app.telegram.keyboards.menu import main_menu
+from app.telegram.keyboards.write_translation import write_translation_menu
+from app.telegram.states.write_translation import WriteTranslation
 
 
 async def send_question(message: Message):
@@ -26,7 +25,7 @@ async def send_question(message: Message):
 
 
 async def init_write_translation(message: Message, state: FSMContext) -> None:
-    initial_text = '<i>В режиме Правописание</i>'
+    initial_text = '<i>В режиме Правописаниеapp.</i>'
     await message.answer(text=initial_text, reply_markup=write_translation_menu().as_markup(resize_keyboard=True))
 
     await state.set_state(WriteTranslation.back_to_menu)

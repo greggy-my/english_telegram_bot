@@ -1,6 +1,8 @@
 import asyncio
-from translations.translation import Translation
-from db.database_manager import MongoDBManager
+
+from app.translations.translation import Translation
+
+from .database_manager import MongoDBManager, UserProgress
 
 
 async def actualise_users_progress() -> None:
@@ -48,13 +50,8 @@ async def initiate_user_progress(user_id: int) -> None:
     if not await MongoDBManager.check_user_id_existence(collection_name='user_progress', user_id=user_id):
         ru_progress = {word_key: 1 for word_key in Translation.ru_list}
         en_progress = {word_key: 1 for word_key in Translation.en_list}
-        await MongoDBManager.insert_user_progress(
-            {
-                'user_id': user_id,
-                'en_progress': en_progress,
-                'ru_progress': ru_progress
-            }
-        )
+        user_progress = UserProgress(user_id=user_id, en_progress=en_progress, ru_progress=ru_progress)
+        await MongoDBManager.insert_user_progress(user_progress.__dict__)
 
 
 async def update_user_progress(user_id: int,

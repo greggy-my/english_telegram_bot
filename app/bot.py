@@ -1,27 +1,37 @@
 import asyncio
 import logging
 import sys
+
 from aiogram import F
-from aiogram.filters import CommandStart, Command, and_f, or_f
+from aiogram.filters import Command, CommandStart, and_f, or_f
 
-from telegram.handlers import admin, user_commands
-from telegram.utils.bot_param_register import set_description, set_user_commands
-from telegram.loader import dp, bot
-
-from telegram.handlers.search import init_search, find_translation, cancel_search
-from telegram.handlers.quiz import spin, check_translation, cancel_quiz
-from db.user_progress import actualise_users_progress
-from db.database_manager import create_tables
-from translations.translation import Translation
-from telegram.states.feedback import GetFeedback
-from telegram.states.search import Search
-from telegram.states.quiz import Quiz
-from telegram.states.write_translation import WriteTranslation
-from telegram.states.choose_unit import ChooseUnit
-from telegram.handlers.write_translation import init_write_translation, send_question, check_answer, \
-    show_right_translation, cancel_write_translation
-from telegram.handlers.choose_unit import init_choose_unit, choose_unit, cancel_choose_unit, approve_choose_unit
-from telegram.middleware.chat_action import ChatActionMiddleware
+from app.db.database_manager import create_tables
+from app.db.user_progress import actualise_users_progress
+from app.telegram.handlers import admin, user_commands
+from app.telegram.handlers.choose_unit import (
+    approve_choose_unit,
+    cancel_choose_unit,
+    choose_unit,
+    init_choose_unit,
+)
+from app.telegram.handlers.quiz import cancel_quiz, check_translation, spin
+from app.telegram.handlers.search import cancel_search, find_translation, init_search
+from app.telegram.handlers.write_translation import (
+    cancel_write_translation,
+    check_answer,
+    init_write_translation,
+    send_question,
+    show_right_translation,
+)
+from app.telegram.loader import bot, dp
+from app.telegram.middleware.chat_action import ChatActionMiddleware
+from app.telegram.states.choose_unit import ChooseUnit
+from app.telegram.states.feedback import GetFeedback
+from app.telegram.states.quiz import Quiz
+from app.telegram.states.search import Search
+from app.telegram.states.write_translation import WriteTranslation
+from app.telegram.utils.bot_param_register import set_description, set_user_commands
+from app.translations.translation import Translation
 
 
 async def main() -> None:
@@ -40,6 +50,7 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         await bot.session.close()
+
 
 
 # middleware

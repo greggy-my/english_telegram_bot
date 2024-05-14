@@ -1,9 +1,11 @@
-from typing import Any, Callable, Dict, Awaitable
+from typing import Any, Awaitable, Callable, Dict
+
 from aiogram import BaseMiddleware
 from aiogram.dispatcher.flags import get_flag
 from aiogram.types import Message
 from aiogram.utils.chat_action import ChatActionSender
-from telegram.loader import bot
+
+from app.telegram.loader import bot
 
 
 class ChatActionMiddleware(BaseMiddleware):

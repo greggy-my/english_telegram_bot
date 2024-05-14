@@ -1,6 +1,7 @@
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
-from telegram.loader import States
+
+from app.telegram.loader import States
 
 
 class InMaintenance(BaseFilter):

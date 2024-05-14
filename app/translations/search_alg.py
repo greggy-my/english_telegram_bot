@@ -1,7 +1,9 @@
 import re
+
 from fuzzywuzzy import fuzz
-from translations.translation import Translation
-from translations.text_processing import TextProcessor
+
+from app.translations.text_processing import TextProcessor
+from app.translations.translation import Translation
 
 
 class HashSearch:
@@ -11,7 +13,7 @@ class HashSearch:
         if len(Translation.ru_hash_dict) == 0 or len(Translation.ru_word_dict) == 0:
             raise Exception('Empty Translation')
 
-        if len(query) == 0:
+        if len(query) == 0 or query.isdigit():
             return None, None
 
         language = TextProcessor.detect_text_language(query)

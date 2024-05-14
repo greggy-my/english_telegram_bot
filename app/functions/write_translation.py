@@ -1,5 +1,6 @@
 import random
-from translations.translation import Translation
+
+from app.translations.translation import Translation
 
 
 def choose_ru_question(chosen_unit: str) -> tuple[str, str]:

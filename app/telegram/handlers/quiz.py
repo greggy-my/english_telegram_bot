@@ -1,15 +1,13 @@
 from aiogram import Bot
-from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 
-from telegram.keyboards.quiz import quiz_inline_keyboard
-from functions.quiz import choose_question, choose_options
-
-from db.database_manager import MongoDBManager
-from db.user_progress import update_user_progress
-
-from telegram.states.quiz import Quiz
-from telegram.keyboards.menu import main_menu, back_to_menu
+from app.db.database_manager import MongoDBManager
+from app.db.user_progress import update_user_progress
+from app.functions.quiz import choose_options, choose_question
+from app.telegram.keyboards.menu import back_to_menu, main_menu
+from app.telegram.keyboards.quiz import quiz_inline_keyboard
+from app.telegram.states.quiz import Quiz
 
 
 async def spin(message: Message, state: FSMContext) -> None:

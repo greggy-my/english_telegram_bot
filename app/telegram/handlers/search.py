@@ -1,9 +1,9 @@
-from aiogram import Bot
-from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from translations.search_alg import HashSearch
-from telegram.states.search import Search
-from telegram.keyboards.menu import main_menu, back_to_menu
+from aiogram.types import Message
+
+from app.telegram.keyboards.menu import back_to_menu, main_menu
+from app.telegram.states.search import Search
+from app.translations.search_alg import HashSearch
 
 
 async def init_search(message: Message, state: FSMContext) -> None:

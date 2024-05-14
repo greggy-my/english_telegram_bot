@@ -1,6 +1,7 @@
-import pandas as pd
 import os
 from collections import defaultdict
+
+import pandas as pd
 
 
 class Translation:

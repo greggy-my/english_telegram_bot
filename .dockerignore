@@ -1,0 +1,12 @@
+.gitignore
+migrations
+alembic.ini
+.env_test
+venv
+.idea
+__pycache__
+.env_dev
+.test.env
+alembic.ini
+/tests
+/.pytest_cache

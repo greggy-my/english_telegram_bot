@@ -2,7 +2,7 @@
 class TextProcessor:
 
     @classmethod
-    def detect_text_language(cls, text: str) -> str:
+    def detect_text_language(cls, text: str) -> str | None:
         """Returns a language of a string (russian and english)"""
         # Define character sets for different languages
         russian_chars = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюя")
@@ -18,4 +18,8 @@ class TextProcessor:
         elif num_english_chars > num_russian_chars:
             return "english"
         else:
-            return "Unknown"
+            return None
+
+
+if __name__ == '__main__':
+    print(TextProcessor.detect_text_language(1))

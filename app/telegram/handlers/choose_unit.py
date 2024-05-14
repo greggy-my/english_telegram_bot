@@ -1,13 +1,15 @@
 from aiogram import Bot
-from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
-from aiogram.enums import ParseMode
+from aiogram.types import CallbackQuery, Message
 
-from db.database_manager import MongoDBManager
-
-from telegram.states.choose_unit import ChooseUnit
-from telegram.keyboards.menu import main_menu
-from telegram.keyboards.choose_unit import inline_choose_unit, approve_choose_unit_keyboard, cancel_choose_unit_keyboard
+from app.db.database_manager import MongoDBManager
+from app.telegram.keyboards.choose_unit import (
+    approve_choose_unit_keyboard,
+    cancel_choose_unit_keyboard,
+    inline_choose_unit,
+)
+from app.telegram.keyboards.menu import main_menu
+from app.telegram.states.choose_unit import ChooseUnit
 
 
 async def init_choose_unit(message: Message, state: FSMContext) -> None:
