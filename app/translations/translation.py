@@ -47,15 +47,15 @@ class Translation:
         """Builds a hash map of splited_words to strings based on the text population"""
         def process_words(lst, hash_dict):
             for word in lst:
-                splitted_words = word.split()
-                if ' ' in splitted_words:
-                    splitted_words.append(' ')
-                for splitted_word in splitted_words:
-                    splitted_word = splitted_word.lower()
-                    if word in hash_dict:
-                        hash_dict[word].append(splitted_word)
+                split_words = word.split()
+                if ' ' in split_words:
+                    split_words.append(' ')
+                for split_word in split_words:
+                    split_word = split_word.lower()
+                    if split_word in hash_dict:
+                        hash_dict[split_word].append(word)
                     else:
-                        hash_dict[word] = [splitted_word]
+                        hash_dict[split_word] = [word]
 
         # Processing Russian list
         process_words(cls.ru_word_dict.keys(), cls.ru_hash_dict)

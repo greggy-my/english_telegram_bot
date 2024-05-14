@@ -25,7 +25,7 @@ async def send_question(message: Message):
 
 
 async def init_write_translation(message: Message, state: FSMContext) -> None:
-    initial_text = '<i>В режиме Правописаниеapp.</i>'
+    initial_text = '<i>В режиме Правописание.</i>'
     await message.answer(text=initial_text, reply_markup=write_translation_menu().as_markup(resize_keyboard=True))
 
     await state.set_state(WriteTranslation.back_to_menu)
